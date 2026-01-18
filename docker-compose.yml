@@ -110,19 +110,15 @@ services:
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
-        echo "$NUMBER_OF_VALIDATORS"
-        echo "$EL_AND_CL_MNEMONIC"
         source /defaults/defaults.env
         source /values.env
-        echo "$NUMBER_OF_VALIDATORS"
-        echo "$EL_AND_CL_MNEMONIC"
         eth2-val-tools \
           keystores \
           --insecure \
-          --out-loc /validator-keys \
+          --out-loc /validator-keys/keys \
           --source-min 0 \
-          --source-max "$NUMBER_OF_VALIDATORS" \
-          --source-mnemonic "$EL_AND_CL_MNEMONIC"
+          --source-max "$$NUMBER_OF_VALIDATORS" \
+          --source-mnemonic "$$EL_AND_CL_MNEMONIC"
     volumes:
       - ./config/values.env:/values.env
       - validator-keys:/validator-keys
@@ -137,7 +133,7 @@ services:
     command:
       - lighthouse
       - vc
-      - --secrets-dir=/validator-keys/secrets
+      - --secrets-dir=/validator-keys/keys/secrets
       - --testnet-dir=/genesis-data/metadata
       - --beacon-nodes=http://lighthouse:5052
       - --init-slashing-protection
@@ -148,6 +144,8 @@ services:
     depends_on:
       lighthouse:
         condition: service_started
+      validator-keygen:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
