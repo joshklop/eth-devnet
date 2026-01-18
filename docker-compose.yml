@@ -133,10 +133,12 @@ services:
     command:
       - lighthouse
       - vc
+      - --validators-dir=/validator-keys/keys/keys
       - --secrets-dir=/validator-keys/keys/secrets
       - --testnet-dir=/genesis-data/metadata
       - --beacon-nodes=http://lighthouse:5052
       - --init-slashing-protection
+      - --suggested-fee-recipient=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
       - --debug-level=info
     volumes:
       - validator-keys:/validator-keys
