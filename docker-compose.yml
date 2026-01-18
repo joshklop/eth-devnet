@@ -45,7 +45,6 @@ services:
       - --nodiscover
       - --maxpeers=0
       - --verbosity=3
-      - --networkid=3238210
     ports:
       - "8545:8545"
       - "8546:8546"
