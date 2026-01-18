@@ -1,0 +1,132 @@
+# Simple L1 Ethereum Devnet with Fusaka (Prague/Electra) fork
+# Uses ethpandaops' tooling for reliable devnet setup
+
+services:
+  # Genesis generator - creates all config files
+  genesis:
+    image: ethpandaops/ethereum-genesis-generator:5.2.2
+    container_name: genesis
+    command: all
+    volumes:
+      - genesis-data:/data
+      - ./config/values.env:/config/values.env
+
+  # Execution Layer - Geth
+  geth:
+    image: ethereum/client-go:latest
+    container_name: geth
+    command:
+      - --datadir=/execution-data
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8545
+      - --http.api=eth,net,web3,debug,txpool,engine,admin,personal
+      - --http.corsdomain=*
+      - --http.vhosts=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=8546
+      - --ws.api=eth,net,web3,debug,txpool,engine
+      - --ws.origins=*
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=8551
+      - --authrpc.vhosts=*
+      - --authrpc.jwtsecret=/data/metadata/jwtsecret
+      - --syncmode=full
+      - --gcmode=archive
+      - --nodiscover
+      - --maxpeers=0
+      - --verbosity=3
+      - --networkid=3238210
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+      - "8551:8551"
+    volumes:
+      - geth-data:/execution-data
+      - genesis-data:/data
+    depends_on:
+      geth-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8545"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Initialize Geth
+  geth-init:
+    image: ethereum/client-go:latest
+    container_name: geth-init
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ ! -d /execution-data/geth ]; then
+          geth init --datadir=/execution-data /data/metadata/genesis.json
+        fi
+    volumes:
+      - geth-data:/execution-data
+      - genesis-data:/data
+    depends_on:
+      genesis:
+        condition: service_completed_successfully
+
+  # Generate validator keys
+  validator-keygen:
+    image: ethpandaops/ethereum-genesis-generator:5.2.2
+    container_name: validator-keygen
+    command: |
+      source /config/defaults.env
+      source /config/values.env
+
+      eth2-val-tools \
+       keystores \
+       --insecure \
+       --out-loc /data/vc-keystores \
+       --source-min 0 \
+       --source-max ${NUMBER_OF_VALIDATORS} \
+       --source-mnemonic ${EL_AND_CL_MNEMONIC}
+    volumes:
+      - ./config/values.env:config/values.env
+      - genesis-data:/data
+    depends_on:
+      genesis:
+        condition: service_completed_successfully
+
+  # Consensus Layer - Teku (beacon + validator in one)
+  teku:
+    image: consensys/teku:latest
+    container_name: teku
+    command:
+      - --network=/data/metadata/config.yaml
+      - --initial-state=/data/metadata/genesis.ssz
+      - --data-path=/consensus-data
+      - --ee-endpoint=http://geth:8551
+      - --ee-jwt-secret-file=/data/metadata/jwtsecret
+      - --rest-api-enabled=true
+      - --rest-api-interface=0.0.0.0
+      - --rest-api-port=5052
+      - --rest-api-host-allowlist=*
+      - --p2p-enabled=false
+      - --validator-keys=/data/validator_keys/keys:/data/validator_keys/secrets
+      - --validators-proposer-default-fee-recipient=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - --logging=INFO
+      - --log-destination=CONSOLE
+    ports:
+      - "5052:5052"
+      - "9000:9000"
+    volumes:
+      - teku-data:/consensus-data
+      - genesis-data:/data
+    depends_on:
+      geth:
+        condition: service_healthy
+      validator-keygen:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  genesis-data:
+  geth-data:
+  teku-data:
