@@ -1,5 +1,11 @@
-# Simple L1 Ethereum Devnet with Fusaka (Prague/Electra) fork
-# Uses ethpandaops' tooling for reliable devnet setup
+configs:
+  values-env:
+    content: |
+      export SECONDS_PER_SLOT=6
+      export NUMBER_OF_VALIDATORS=1
+      export EL_AND_CL_MNEMONIC='test test test test test test test test test test test junk'
+      export GENESIS_TIMESTAMP=$(date +%s)
+      export GENESIS_DELAY=20
 
 services:
   # Genesis generator - creates all config files
@@ -7,9 +13,11 @@ services:
     image: ethpandaops/ethereum-genesis-generator:5.2.2
     container_name: genesis
     command: all
+    configs:
+      - source: values-env
+        target: /config/values.env
     volumes:
       - genesis-data:/data
-      - ./config/values.env:/config/values.env
 
   # Execution Layer - Geth
   geth:
@@ -119,12 +127,11 @@ services:
           --source-min 0 \
           --source-max "$$NUMBER_OF_VALIDATORS" \
           --source-mnemonic "$$EL_AND_CL_MNEMONIC"
+    configs:
+      - source: values-env
+        target: /values.env
     volumes:
-      - ./config/values.env:/values.env
       - validator-keys:/validator-keys
-    depends_on:
-      genesis:
-        condition: service_completed_successfully
 
   # Validator Client - Lighthouse
   lighthouse-vc:
