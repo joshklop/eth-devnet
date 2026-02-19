@@ -173,6 +173,68 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Blob Archiver - archives blobs from the beacon chain to local storage
+  blob-archiver:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:f6291e537bd9de2c3bb415cace47812b3cc19f87
+    platform: linux/amd64
+    container_name: blob-archiver
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for lighthouse beacon API..."
+        until wget -qO /tmp/genesis.json http://lighthouse:5052/eth/v1/beacon/headers/genesis 2>/dev/null; do
+          sleep 2
+        done
+        GENESIS_ROOT=$$(sed 's/.*"root":"\([^"]*\)".*/\1/' /tmp/genesis.json)
+        echo "Genesis block root: $$GENESIS_ROOT"
+        export BLOB_ARCHIVER_ORIGIN_BLOCK=$$GENESIS_ROOT
+        exec blob-archiver
+    environment:
+      - BLOB_ARCHIVER_L1_BEACON_HTTP=http://lighthouse:5052
+      - BLOB_ARCHIVER_DATA_STORE=file
+      - BLOB_ARCHIVER_FILE_DIRECTORY=/data
+      - BLOB_ARCHIVER_METRICS_ENABLED=true
+      - BLOB_ARCHIVER_METRICS_PORT=7300
+    volumes:
+      - blob-data:/data
+    depends_on:
+      lighthouse:
+        condition: service_started
+    restart: unless-stopped
+
+  # Blob API - serves archived blobs over HTTP for OP Stack derivation
+  blob-api:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:f6291e537bd9de2c3bb415cace47812b3cc19f87
+    platform: linux/amd64
+    container_name: blob-api
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for lighthouse beacon API..."
+        until wget -qO /dev/null http://lighthouse:5052/eth/v1/beacon/headers/head 2>/dev/null; do
+          sleep 2
+        done
+        exec blob-api
+    environment:
+      - BLOB_API_L1_BEACON_HTTP=http://lighthouse:5052
+      - BLOB_API_DATA_STORE=file
+      - BLOB_API_FILE_DIRECTORY=/data
+      - BLOB_API_METRICS_ENABLED=true
+      - BLOB_API_METRICS_PORT=7301
+    ports:
+      - "5058:8000"
+    volumes:
+      - blob-data:/data
+    depends_on:
+      blob-archiver:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "-", "http://localhost:8000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   # Chain readiness check - exits when blocks are being produced and indexing is complete
   chain-ready:
     image: ghcr.io/foundry-rs/foundry:latest
@@ -204,3 +266,4 @@ volumes:
   geth-data:
   lighthouse-data:
   validator-keys:
+  blob-data:
