@@ -47,6 +47,7 @@ services:
       - --verbosity=3
       - --miner.gasprice=1
       - --miner.recommit=100ms
+      - --rpc.allow-unprotected-txs
     ports:
       - "8545:8545"
       - "8546:8546"
@@ -134,6 +135,20 @@ services:
     volumes:
       - validator-keys:/validator-keys
 
+  # Serves genesis.json (and other metadata) over HTTP
+  genesis-server:
+    image: python:3-alpine
+    container_name: genesis-server
+    command: python -m http.server 8080 --directory /genesis-data/metadata
+    ports:
+      - "8080:8080"
+    volumes:
+      - genesis-data:/genesis-data
+    depends_on:
+      genesis:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   # Validator Client - Lighthouse
   lighthouse-vc:
     image: sigp/lighthouse:latest
@@ -157,6 +172,32 @@ services:
       validator-keygen:
         condition: service_completed_successfully
     restart: unless-stopped
+
+  # Chain readiness check - exits when blocks are being produced and indexing is complete
+  chain-ready:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: chain-ready
+    depends_on:
+      geth:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for chain to be ready..."
+        while true; do
+          BLOCK=$$(cast block-number --rpc-url http://geth:8545 2>/dev/null || echo "0")
+          if [ "$$BLOCK" != "0" ] && [ -n "$$BLOCK" ]; then
+            # Blocks exist, now verify indexing is complete by querying logs
+            if cast logs --from-block 1 --to-block 1 --rpc-url http://geth:8545 >/dev/null 2>&1; then
+              echo "Chain is ready. Block: $$BLOCK, indexing complete."
+              exit 0
+            fi
+            echo "Block $$BLOCK exists, waiting for indexing..."
+          else
+            echo "Waiting for block 1..."
+          fi
+          sleep 2
+        done
 
 volumes:
   genesis-data:
