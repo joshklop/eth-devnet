@@ -235,6 +235,115 @@ services:
       timeout: 3s
       retries: 10
 
+  # ========== L2 Services (OP Stack) ==========
+
+  # Initialize op-reth with L2 genesis
+  op-reth-init:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v1.11.0
+    container_name: op-reth-init
+    entrypoint: ["op-reth", "init", "--chain", "/l2-data/genesis.json", "--datadir", "/l2-execution-data"]
+    volumes:
+      - op-reth-data:/l2-execution-data
+      - ./l2-data:/l2-data:ro
+    profiles: [l2]
+
+  # L2 Execution Engine - op-reth
+  op-reth:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v1.11.0
+    container_name: op-reth
+    command:
+      - node
+      - --chain=/l2-data/genesis.json
+      - --datadir=/l2-execution-data
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=9545
+      - --http.api=eth,net,web3,debug,txpool
+      - --http.corsdomain=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=9546
+      - --ws.api=eth,net,web3,debug,txpool
+      - --ws.origins=*
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=9551
+      - --authrpc.jwtsecret=/l2-data/jwt.txt
+      - --rollup.disable-tx-pool-gossip
+      - --disable-discovery
+    ports:
+      - "9545:9545"
+      - "9546:9546"
+      - "9551:9551"
+    volumes:
+      - op-reth-data:/l2-execution-data
+      - ./l2-data:/l2-data:ro
+    depends_on:
+      op-reth-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9545 || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    profiles: [l2]
+
+  # L2 Consensus / Derivation - op-node
+  op-node:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:latest
+    container_name: op-node
+    command:
+      - op-node
+      - --l1=http://geth:8545
+      - --l1.beacon=http://lighthouse:5052
+      - --l2=http://op-reth:9551
+      - --l2.jwt-secret=/l2-data/jwt.txt
+      - --rollup.config=/l2-data/rollup.json
+      - --rpc.addr=0.0.0.0
+      - --rpc.port=8547
+      - --sequencer.enabled
+      - --sequencer.l1-confs=0
+      - --p2p.disable
+      - --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+      - --l1.trustrpc
+    ports:
+      - "8547:8547"
+    volumes:
+      - ./l2-data:/l2-data:ro
+    depends_on:
+      op-reth:
+        condition: service_healthy
+      geth:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: [l2]
+
+  # L2 Batch Submitter - op-batcher
+  op-batcher:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:latest
+    container_name: op-batcher
+    command:
+      - op-batcher
+      - --l1-eth-rpc=http://geth:8545
+      - --l2-eth-rpc=http://op-reth:9545
+      - --rollup-rpc=http://op-node:8547
+      - --private-key=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+      - --data-availability-type=blobs
+      - --max-channel-duration=1
+      - --poll-interval=1s
+      - --num-confirmations=1
+      - --sub-safety-margin=4
+      - --wait-node-sync=false
+      - --rpc.addr=0.0.0.0
+      - --rpc.port=8548
+    ports:
+      - "8548:8548"
+    depends_on:
+      op-node:
+        condition: service_started
+    restart: unless-stopped
+    profiles: [l2]
+
   # Chain readiness check - exits when blocks are being produced and indexing is complete
   chain-ready:
     image: ghcr.io/foundry-rs/foundry:latest
@@ -260,6 +369,10 @@ services:
           fi
           sleep 2
         done
+#
+#networks:
+#  default:
+#    name: eth-devnet
 
 volumes:
   genesis-data:
@@ -267,3 +380,4 @@ volumes:
   lighthouse-data:
   validator-keys:
   blob-data:
+  op-reth-data:
