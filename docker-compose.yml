@@ -235,17 +235,66 @@ services:
       timeout: 3s
       retries: 10
 
-  # ========== L2 Services (OP Stack) ==========
+  # ========== L2 Deploy Services ==========
+
+  # Deploy OP Stack contracts to L1
+  op-deploy:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: op-deploy
+    user: root
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - apk add --no-cache jq && /scripts/op.sh
+    environment:
+      - L1_RPC_URL=http://geth:8545
+      - OUTPUT_DIR=/deployments
+      - OPTIMISM_DIR=/optimism
+    volumes:
+      - ./op.sh:/scripts/op.sh:ro
+      - ${OPTIMISM_DIR}:/optimism
+      - deployments:/deployments
+    depends_on:
+      chain-ready:
+        condition: service_completed_successfully
+
+  # Generate L2 genesis and rollup config
+  l2-deploy:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: l2-deploy
+    user: root
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - apk add --no-cache jq openssl && /scripts/l2.sh
+    environment:
+      - L1_RPC_URL=http://geth:8545
+      - DEPLOY_DIR=/deployments
+      - L2_DATA_DIR=/l2-data
+      - OPTIMISM_DIR=/optimism
+    volumes:
+      - ./l2.sh:/scripts/l2.sh:ro
+      - ${OPTIMISM_DIR}:/optimism:ro
+      - deployments:/deployments:ro
+      - l2-data:/l2-data
+    depends_on:
+      op-deploy:
+        condition: service_completed_successfully
+
+  # ========== L2 Runtime Services (OP Stack) ==========
 
   # Initialize op-reth with L2 genesis
   op-reth-init:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v1.11.0
     container_name: op-reth-init
-    entrypoint: ["op-reth", "init", "--chain", "/l2-data/genesis.json", "--datadir", "/l2-execution-data"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        op-reth init --chain /l2-data/genesis.json --datadir /l2-execution-data
     volumes:
       - op-reth-data:/l2-execution-data
-      - ./l2-data:/l2-data:ro
-    profiles: [l2]
+      - l2-data:/l2-data:ro
+    depends_on:
+      l2-deploy:
+        condition: service_completed_successfully
 
   # L2 Execution Engine - op-reth
   op-reth:
@@ -276,7 +325,7 @@ services:
       - "9551:9551"
     volumes:
       - op-reth-data:/l2-execution-data
-      - ./l2-data:/l2-data:ro
+      - l2-data:/l2-data:ro
     depends_on:
       op-reth-init:
         condition: service_completed_successfully
@@ -286,7 +335,6 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
-    profiles: [l2]
 
   # L2 Consensus / Derivation - op-node
   op-node:
@@ -309,14 +357,13 @@ services:
     ports:
       - "8547:8547"
     volumes:
-      - ./l2-data:/l2-data:ro
+      - l2-data:/l2-data:ro
     depends_on:
       op-reth:
         condition: service_healthy
       geth:
         condition: service_healthy
     restart: unless-stopped
-    profiles: [l2]
 
   # L2 Batch Submitter - op-batcher
   op-batcher:
@@ -342,7 +389,6 @@ services:
       op-node:
         condition: service_started
     restart: unless-stopped
-    profiles: [l2]
 
   # Chain readiness check - exits when blocks are being produced and indexing is complete
   chain-ready:
@@ -369,15 +415,12 @@ services:
           fi
           sleep 2
         done
-#
-#networks:
-#  default:
-#    name: eth-devnet
-
 volumes:
   genesis-data:
   geth-data:
   lighthouse-data:
   validator-keys:
   blob-data:
+  deployments:
+  l2-data:
   op-reth-data:
