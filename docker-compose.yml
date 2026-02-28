@@ -10,7 +10,7 @@ configs:
 services:
   # Genesis generator - creates all config files
   genesis:
-    image: ethpandaops/ethereum-genesis-generator:5.2.2
+    image: ethpandaops/ethereum-genesis-generator:5.3.0
     container_name: genesis
     command: all
     configs:
@@ -21,7 +21,7 @@ services:
 
   # Execution Layer - Geth
   geth:
-    image: ethereum/client-go:stable
+    image: ethereum/client-go@sha256:84e72946ce7034e9e4623385fe2ad15d995135e5cf61ae80bf32bb2a525f77ed
     container_name: geth
     command:
       - --datadir=/execution-data
@@ -67,7 +67,7 @@ services:
 
   # Initialize Geth
   geth-init:
-    image: ethereum/client-go:latest
+    image: ethereum/client-go@sha256:84e72946ce7034e9e4623385fe2ad15d995135e5cf61ae80bf32bb2a525f77ed
     container_name: geth-init
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -84,7 +84,7 @@ services:
 
   # Consensus Layer - Lighthouse
   lighthouse:
-    image: sigp/lighthouse:latest
+    image: sigp/lighthouse@sha256:4892f483320f3920e00f61d08fdf3b38db56377562bdef0d1832ea8add09b9e8
     container_name: lighthouse
     command:
       - lighthouse
@@ -151,7 +151,7 @@ services:
 
   # Validator Client - Lighthouse
   lighthouse-vc:
-    image: sigp/lighthouse:latest
+    image: sigp/lighthouse@sha256:4892f483320f3920e00f61d08fdf3b38db56377562bdef0d1832ea8add09b9e8
     container_name: lighthouse-vc
     command:
       - lighthouse
@@ -237,46 +237,214 @@ services:
 
   # ========== L2 Deploy Services ==========
 
-  # Deploy OP Stack contracts to L1
-  op-deploy:
-    image: ghcr.io/foundry-rs/foundry:latest
-    container_name: op-deploy
-    user: root
+  # Deploy deterministic deployer contract to L1
+  deploy-deterministic-deployer:
+    image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
+    container_name: deploy-deterministic-deployer
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - apt-get update && apt-get install -y jq && /scripts/op.sh
-    environment:
-      - L1_RPC_URL=http://geth:8545
-      - OUTPUT_DIR=/deployments
-      - OPTIMISM_DIR=/optimism
-    volumes:
-      - ./op.sh:/scripts/op.sh:ro
-      - ${OPTIMISM_DIR}:/optimism
-      - deployments:/deployments
+      - |
+        echo "=== Deploying Deterministic Deployer ==="
+        cast send 0x3fab184622dc19b6109349b94811493bf2a45362 \
+          --from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+          --value 10000000000000000 \
+          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --rpc-url http://geth:8545
+        cast rpc eth_sendRawTransaction 0xf8a58085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf31ba02222222222222222222222222222222222222222222222222222222222222222a02222222222222222222222222222222222222222222222222222222222222222 \
+          --rpc-url http://geth:8545
+        echo "Deterministic deployer deployed at 0x4e59b44847b379578588920cA78FbF26c0B4956C"
     depends_on:
-      chain-ready:
+      l1-el-ready:
         condition: service_completed_successfully
 
-  # Generate L2 genesis and rollup config
-  l2-deploy:
-    image: ghcr.io/foundry-rs/foundry:latest
-    container_name: l2-deploy
-    user: root
+  # Bootstrap superchain contracts on L1
+  bootstrap-superchain:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
+    platform: linux/amd64
+    container_name: bootstrap-superchain
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - apt-get update && apt-get install -y jq && /scripts/l2.sh
-    environment:
-      - L1_RPC_URL=http://geth:8545
-      - DEPLOY_DIR=/deployments
-      - L2_DATA_DIR=/l2-data
-      - OPTIMISM_DIR=/optimism
+      - |
+        echo "=== Bootstrap Superchain ==="
+        op-deployer bootstrap superchain \
+          --l1-rpc-url=http://geth:8545 \
+          --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --outfile=/deployments/superchain.json \
+          --superchain-proxy-admin-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+          --protocol-versions-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+          --guardian=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+        echo "Superchain bootstrap complete:"
+        cat /deployments/superchain.json
     volumes:
-      - ./l2.sh:/scripts/l2.sh:ro
-      - ${OPTIMISM_DIR}:/optimism:ro
+      - deployments:/deployments
+    depends_on:
+      deploy-deterministic-deployer:
+        condition: service_completed_successfully
+
+  # Bootstrap OP Stack implementation contracts on L1
+  bootstrap-implementations:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
+    platform: linux/amd64
+    container_name: bootstrap-implementations
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=== Bootstrap Implementations ==="
+        SUPERCHAIN_CONFIG_PROXY=$$(grep '"superchainConfigProxyAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
+        PROTOCOL_VERSIONS_PROXY=$$(grep '"protocolVersionsProxyAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
+        SUPERCHAIN_PROXY_ADMIN=$$(grep '"proxyAdminAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
+        echo "SuperchainConfigProxy: $$SUPERCHAIN_CONFIG_PROXY"
+        echo "ProtocolVersionsProxy: $$PROTOCOL_VERSIONS_PROXY"
+        echo "SuperchainProxyAdmin: $$SUPERCHAIN_PROXY_ADMIN"
+        op-deployer bootstrap implementations \
+          --l1-rpc-url=http://geth:8545 \
+          --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --outfile=/deployments/implementations.json \
+          --superchain-config-proxy=$$SUPERCHAIN_CONFIG_PROXY \
+          --protocol-versions-proxy=$$PROTOCOL_VERSIONS_PROXY \
+          --superchain-proxy-admin=$$SUPERCHAIN_PROXY_ADMIN \
+          --upgrade-controller=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+          --challenger=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+        echo "Implementations bootstrap complete:"
+        cat /deployments/implementations.json
+    volumes:
+      - deployments:/deployments
+    depends_on:
+      bootstrap-superchain:
+        condition: service_completed_successfully
+
+  # Initialize L2 deployment: scaffold intent and patch config
+  l2-deploy-init:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
+    platform: linux/amd64
+    container_name: l2-deploy-init
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=== L2 Deploy Init ==="
+        OPCM_ADDRESS=$$(grep '"opcmAddress"' /deployments/implementations.json | sed 's/.*: *"\([^"]*\)".*/\1/')
+        echo "OPCM address: $$OPCM_ADDRESS"
+        CHAIN_ID_HEX=$$(wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+          --header='Content-Type: application/json' http://geth:8545 | \
+          sed 's/.*"result":"\([^"]*\)".*/\1/')
+        L1_CHAIN_ID=$$(printf "%d" "$$CHAIN_ID_HEX")
+        echo "L1 chain ID: $$L1_CHAIN_ID"
+        op-deployer init \
+          --l1-chain-id "$$L1_CHAIN_ID" \
+          --l2-chain-ids 10200 \
+          --workdir /l2-data \
+          --intent-type custom
+        L1_LOCATOR=$$(grep '^l1ContractsLocator' /l2-data/intent.toml | sed 's/l1ContractsLocator = "\(.*\)"/\1/')
+        L2_LOCATOR=$$(grep '^l2ContractsLocator' /l2-data/intent.toml | sed 's/l2ContractsLocator = "\(.*\)"/\1/')
+        echo "L1 locator: $$L1_LOCATOR"
+        echo "L2 locator: $$L2_LOCATOR"
+        cat > /l2-data/intent.toml <<TOML
+        configType = "custom"
+        l1ChainID = $$L1_CHAIN_ID
+        l1ContractsLocator = "$$L1_LOCATOR"
+        l2ContractsLocator = "$$L2_LOCATOR"
+        fundDevAccounts = true
+        useInterop = false
+        opcmAddress = "$$OPCM_ADDRESS"
+
+        [[chains]]
+        id = "0x00000000000000000000000000000000000000000000000000000000000027d8"
+        baseFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        l1FeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        sequencerFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        operatorFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        eip1559Denominator = 50
+        eip1559DenominatorCanyon = 250
+        eip1559Elasticity = 6
+        gasLimit = 60_000_000
+
+        [chains.roles]
+        l1ProxyAdminOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        l2ProxyAdminOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        systemConfigOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        unsafeBlockSigner = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        batcher = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+        proposer = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+        challenger = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        TOML
+        echo "intent.toml written:"
+        cat /l2-data/intent.toml
+    volumes:
       - deployments:/deployments:ro
       - l2-data:/l2-data
     depends_on:
-      op-deploy:
+      bootstrap-implementations:
+        condition: service_completed_successfully
+
+  # Deploy L2 chain contracts to L1
+  l2-deploy-apply:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
+    platform: linux/amd64
+    container_name: l2-deploy-apply
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=== L2 Deploy Apply ==="
+        op-deployer apply \
+          --workdir /l2-data \
+          --l1-rpc-url http://geth:8545 \
+          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+        echo "L2 contracts deployed successfully"
+    volumes:
+      - l2-data:/l2-data
+    depends_on:
+      l2-deploy-init:
+        condition: service_completed_successfully
+
+  # Extract genesis, rollup config, and generate JWT
+  l2-deploy-inspect:
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
+    platform: linux/amd64
+    container_name: l2-deploy-inspect
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=== L2 Deploy Inspect ==="
+        op-deployer inspect genesis \
+          --workdir /l2-data \
+          10200 > /l2-data/genesis.json
+        echo "Genesis written to /l2-data/genesis.json"
+        op-deployer inspect rollup \
+          --workdir /l2-data \
+          10200 > /l2-data/rollup.json
+        echo "Rollup config written to /l2-data/rollup.json"
+        od -A n -t x1 -N 32 /dev/urandom | tr -d ' \n' > /l2-data/jwt.txt
+        echo ""
+        echo "JWT secret written to /l2-data/jwt.txt"
+    volumes:
+      - l2-data:/l2-data
+    depends_on:
+      l2-deploy-apply:
+        condition: service_completed_successfully
+
+  # Fund sequencer and batcher accounts on L1
+  l2-fund-accounts:
+    image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
+    container_name: l2-fund-accounts
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=== Funding L2 Accounts ==="
+        cast send 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
+          --from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+          --value 100ether \
+          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --rpc-url http://geth:8545
+        echo "Funded sequencer (0x70997970C51812dc3A010C7d01b50e0d17dc79C8) with 100 ETH"
+        cast send 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC \
+          --from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+          --value 100ether \
+          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --rpc-url http://geth:8545
+        echo "Funded batcher (0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC) with 100 ETH"
+        echo "L2 deployment complete!"
+    depends_on:
+      l2-deploy-inspect:
         condition: service_completed_successfully
 
   # ========== L2 Runtime Services (OP Stack) ==========
@@ -293,7 +461,7 @@ services:
       - op-reth-data:/l2-execution-data
       - l2-data:/l2-data:ro
     depends_on:
-      l2-deploy:
+      l2-fund-accounts:
         condition: service_completed_successfully
 
   # L2 Execution Engine - op-reth
@@ -331,43 +499,48 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9545 || exit 1"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9545"]
       interval: 3s
       timeout: 3s
       retries: 30
 
   # L2 Consensus / Derivation - op-node
   op-node:
-    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:latest
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node@sha256:97853e10aea44c86567b8ca86322972c493f6d3a79d31e3981f9bfccb54eab2d
     container_name: op-node
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - op-node
-      - --l1=http://geth:8545
-      - --l1.beacon=http://lighthouse:5052
-      - --l2=http://op-reth:9551
-      - --l2.jwt-secret=/l2-data/jwt.txt
-      - --rollup.config=/l2-data/rollup.json
-      - --rpc.addr=0.0.0.0
-      - --rpc.port=8547
-      - --sequencer.enabled
-      - --sequencer.l1-confs=0
-      - --p2p.disable
-      - --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
-      - --l1.trustrpc
+    - |
+      sed 's/"terminalTotalDifficultyPassed".*//' /genesis-data/metadata/genesis.json > /tmp/l1-genesis.json
+      exec op-node \
+        --l1=http://geth:8545 \
+        --l1.beacon=http://lighthouse:5052 \
+        --l2=http://op-reth:9551 \
+        --l2.jwt-secret=/l2-data/jwt.txt \
+        --rollup.config=/l2-data/rollup.json \
+        --rpc.addr=0.0.0.0 \
+        --rpc.port=8547 \
+        --sequencer.enabled \
+        --sequencer.l1-confs=0 \
+        --p2p.disable \
+        --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+        --l1.trustrpc \
+        --rollup.l1-chain-config=/tmp/l1-genesis.json
     ports:
       - "8547:8547"
     volumes:
       - l2-data:/l2-data:ro
+      - genesis-data:/genesis-data:ro
     depends_on:
-      op-reth:
-        condition: service_healthy
+      l2-el-ready:
+        condition: service_completed_successfully
       geth:
         condition: service_healthy
     restart: unless-stopped
 
   # L2 Batch Submitter - op-batcher
   op-batcher:
-    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:latest
+    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher@sha256:b737345560e429fbc3a5549a4a396d684108ca4147ec069e2ec5e2b752cb8447
     container_name: op-batcher
     command:
       - op-batcher
@@ -390,29 +563,48 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # Chain readiness check - exits when blocks are being produced and indexing is complete
-  chain-ready:
-    image: ghcr.io/foundry-rs/foundry:latest
-    container_name: chain-ready
+  # L1 EL readiness check - exits when blocks are being produced and indexing is complete
+  l1-el-ready:
+    image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
+    container_name: l1-el-ready
     depends_on:
       geth:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "Waiting for chain to be ready..."
+        echo "Waiting for L1 EL to be ready..."
         while true; do
           BLOCK=$$(cast block-number --rpc-url http://geth:8545 2>/dev/null || echo "0")
           if [ "$$BLOCK" != "0" ] && [ -n "$$BLOCK" ]; then
-            # Blocks exist, now verify indexing is complete by querying logs
             if cast logs --from-block 1 --to-block 1 --rpc-url http://geth:8545 >/dev/null 2>&1; then
-              echo "Chain is ready. Block: $$BLOCK, indexing complete."
+              echo "L1 EL is ready. Block: $$BLOCK, indexing complete."
               exit 0
             fi
             echo "Block $$BLOCK exists, waiting for indexing..."
           else
             echo "Waiting for block 1..."
           fi
+          sleep 2
+        done
+
+  # L2 EL readiness check - exits when op-reth RPC is responsive
+  l2-el-ready:
+    image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
+    container_name: l2-el-ready
+    depends_on:
+      op-reth:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for L2 EL to be ready..."
+        while true; do
+          if cast block-number --rpc-url http://op-reth:9545 2>/dev/null; then
+            echo "L2 EL is ready."
+            exit 0
+          fi
+          echo "Waiting for op-reth..."
           sleep 2
         done
 volumes:
