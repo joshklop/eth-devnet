@@ -244,7 +244,7 @@ services:
     user: root
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - apk add --no-cache jq && /scripts/op.sh
+      - apt-get update && apt-get install -y jq && /scripts/op.sh
     environment:
       - L1_RPC_URL=http://geth:8545
       - OUTPUT_DIR=/deployments
@@ -264,7 +264,7 @@ services:
     user: root
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - apk add --no-cache jq openssl && /scripts/l2.sh
+      - apt-get update && apt-get install -y jq && /scripts/l2.sh
     environment:
       - L1_RPC_URL=http://geth:8545
       - DEPLOY_DIR=/deployments
