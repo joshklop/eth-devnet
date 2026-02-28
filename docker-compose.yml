@@ -12,6 +12,7 @@ services:
   genesis:
     image: ethpandaops/ethereum-genesis-generator:5.3.0
     container_name: genesis
+    profiles: ["l1"]
     command: all
     configs:
       - source: values-env
@@ -23,6 +24,7 @@ services:
   geth:
     image: ethereum/client-go@sha256:84e72946ce7034e9e4623385fe2ad15d995135e5cf61ae80bf32bb2a525f77ed
     container_name: geth
+    profiles: ["l1"]
     command:
       - --datadir=/execution-data
       - --http
@@ -69,6 +71,7 @@ services:
   geth-init:
     image: ethereum/client-go@sha256:84e72946ce7034e9e4623385fe2ad15d995135e5cf61ae80bf32bb2a525f77ed
     container_name: geth-init
+    profiles: ["l1"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -86,6 +89,7 @@ services:
   lighthouse:
     image: sigp/lighthouse@sha256:4892f483320f3920e00f61d08fdf3b38db56377562bdef0d1832ea8add09b9e8
     container_name: lighthouse
+    profiles: ["l1"]
     command:
       - lighthouse
       - bn
@@ -117,6 +121,7 @@ services:
   validator-keygen:
     image: ethpandaops/ethereum-genesis-generator:5.2.2
     container_name: validator-keygen
+    profiles: ["l1"]
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -139,6 +144,7 @@ services:
   genesis-server:
     image: python:3-alpine
     container_name: genesis-server
+    profiles: ["l1"]
     command: python -m http.server 8080 --directory /genesis-data/metadata
     ports:
       - "8080:8080"
@@ -153,6 +159,7 @@ services:
   lighthouse-vc:
     image: sigp/lighthouse@sha256:4892f483320f3920e00f61d08fdf3b38db56377562bdef0d1832ea8add09b9e8
     container_name: lighthouse-vc
+    profiles: ["l1"]
     command:
       - lighthouse
       - vc
@@ -182,7 +189,7 @@ services:
     command:
       - |
         echo "Waiting for lighthouse beacon API..."
-        until wget -qO /tmp/genesis.json http://lighthouse:5052/eth/v1/beacon/headers/genesis 2>/dev/null; do
+        until wget -qO /tmp/genesis.json ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/genesis 2>/dev/null; do
           sleep 2
         done
         GENESIS_ROOT=$$(sed 's/.*"root":"\([^"]*\)".*/\1/' /tmp/genesis.json)
@@ -190,16 +197,13 @@ services:
         export BLOB_ARCHIVER_ORIGIN_BLOCK=$$GENESIS_ROOT
         exec blob-archiver
     environment:
-      - BLOB_ARCHIVER_L1_BEACON_HTTP=http://lighthouse:5052
+      - BLOB_ARCHIVER_L1_BEACON_HTTP=${L1_BEACON_URL:-http://lighthouse:5052}
       - BLOB_ARCHIVER_DATA_STORE=file
       - BLOB_ARCHIVER_FILE_DIRECTORY=/data
       - BLOB_ARCHIVER_METRICS_ENABLED=true
       - BLOB_ARCHIVER_METRICS_PORT=7300
     volumes:
       - blob-data:/data
-    depends_on:
-      lighthouse:
-        condition: service_started
     restart: unless-stopped
 
   # Blob API - serves archived blobs over HTTP for OP Stack derivation
@@ -211,12 +215,12 @@ services:
     command:
       - |
         echo "Waiting for lighthouse beacon API..."
-        until wget -qO /dev/null http://lighthouse:5052/eth/v1/beacon/headers/head 2>/dev/null; do
+        until wget -qO /dev/null ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/head 2>/dev/null; do
           sleep 2
         done
         exec blob-api
     environment:
-      - BLOB_API_L1_BEACON_HTTP=http://lighthouse:5052
+      - BLOB_API_L1_BEACON_HTTP=${L1_BEACON_URL:-http://lighthouse:5052}
       - BLOB_API_DATA_STORE=file
       - BLOB_API_FILE_DIRECTORY=/data
       - BLOB_API_METRICS_ENABLED=true
@@ -246,12 +250,11 @@ services:
       - |
         echo "=== Deploying Deterministic Deployer ==="
         cast send 0x3fab184622dc19b6109349b94811493bf2a45362 \
-          --from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
           --value 10000000000000000 \
-          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-          --rpc-url http://geth:8545
+          --private-key ${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
+          --rpc-url ${L1_RPC_URL:-http://geth:8545}
         cast rpc eth_sendRawTransaction 0xf8a58085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf31ba02222222222222222222222222222222222222222222222222222222222222222a02222222222222222222222222222222222222222222222222222222222222222 \
-          --rpc-url http://geth:8545
+          --rpc-url ${L1_RPC_URL:-http://geth:8545} || true
         echo "Deterministic deployer deployed at 0x4e59b44847b379578588920cA78FbF26c0B4956C"
     depends_on:
       l1-el-ready:
@@ -267,8 +270,9 @@ services:
       - |
         echo "=== Bootstrap Superchain ==="
         op-deployer bootstrap superchain \
-          --l1-rpc-url=http://geth:8545 \
-          --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --log-level=debug \
+          --l1-rpc-url=${L1_RPC_URL:-http://geth:8545} \
+          --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
           --outfile=/deployments/superchain.json \
           --superchain-proxy-admin-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
           --protocol-versions-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
@@ -297,8 +301,8 @@ services:
         echo "ProtocolVersionsProxy: $$PROTOCOL_VERSIONS_PROXY"
         echo "SuperchainProxyAdmin: $$SUPERCHAIN_PROXY_ADMIN"
         op-deployer bootstrap implementations \
-          --l1-rpc-url=http://geth:8545 \
-          --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --l1-rpc-url=${L1_RPC_URL:-http://geth:8545} \
+          --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
           --outfile=/deployments/implementations.json \
           --superchain-config-proxy=$$SUPERCHAIN_CONFIG_PROXY \
           --protocol-versions-proxy=$$PROTOCOL_VERSIONS_PROXY \
@@ -325,13 +329,14 @@ services:
         OPCM_ADDRESS=$$(grep '"opcmAddress"' /deployments/implementations.json | sed 's/.*: *"\([^"]*\)".*/\1/')
         echo "OPCM address: $$OPCM_ADDRESS"
         CHAIN_ID_HEX=$$(wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
-          --header='Content-Type: application/json' http://geth:8545 | \
+          --header='Content-Type: application/json' ${L1_RPC_URL:-http://geth:8545} | \
           sed 's/.*"result":"\([^"]*\)".*/\1/')
         L1_CHAIN_ID=$$(printf "%d" "$$CHAIN_ID_HEX")
         echo "L1 chain ID: $$L1_CHAIN_ID"
+        L2_CHAIN_ID_HEX=$$(printf "0x%064x" ${L2_CHAIN_ID:-10200})
         op-deployer init \
           --l1-chain-id "$$L1_CHAIN_ID" \
-          --l2-chain-ids 10200 \
+          --l2-chain-ids ${L2_CHAIN_ID:-10200} \
           --workdir /l2-data \
           --intent-type custom
         L1_LOCATOR=$$(grep '^l1ContractsLocator' /l2-data/intent.toml | sed 's/l1ContractsLocator = "\(.*\)"/\1/')
@@ -348,7 +353,7 @@ services:
         opcmAddress = "$$OPCM_ADDRESS"
 
         [[chains]]
-        id = "0x00000000000000000000000000000000000000000000000000000000000027d8"
+        id = "$$L2_CHAIN_ID_HEX"
         baseFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         l1FeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         sequencerFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
@@ -387,8 +392,8 @@ services:
         echo "=== L2 Deploy Apply ==="
         op-deployer apply \
           --workdir /l2-data \
-          --l1-rpc-url http://geth:8545 \
-          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+          --l1-rpc-url ${L1_RPC_URL:-http://geth:8545} \
+          --private-key ${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
         echo "L2 contracts deployed successfully"
     volumes:
       - l2-data:/l2-data
@@ -407,11 +412,11 @@ services:
         echo "=== L2 Deploy Inspect ==="
         op-deployer inspect genesis \
           --workdir /l2-data \
-          10200 > /l2-data/genesis.json
+          ${L2_CHAIN_ID:-10200} > /l2-data/genesis.json
         echo "Genesis written to /l2-data/genesis.json"
         op-deployer inspect rollup \
           --workdir /l2-data \
-          10200 > /l2-data/rollup.json
+          ${L2_CHAIN_ID:-10200} > /l2-data/rollup.json
         echo "Rollup config written to /l2-data/rollup.json"
         od -A n -t x1 -N 32 /dev/urandom | tr -d ' \n' > /l2-data/jwt.txt
         echo ""
@@ -431,16 +436,14 @@ services:
       - |
         echo "=== Funding L2 Accounts ==="
         cast send 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-          --from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
           --value 100ether \
-          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-          --rpc-url http://geth:8545
+          --private-key ${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
+          --rpc-url ${L1_RPC_URL:-http://geth:8545}
         echo "Funded sequencer (0x70997970C51812dc3A010C7d01b50e0d17dc79C8) with 100 ETH"
         cast send 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC \
-          --from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
           --value 100ether \
-          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-          --rpc-url http://geth:8545
+          --private-key ${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
+          --rpc-url ${L1_RPC_URL:-http://geth:8545}
         echo "Funded batcher (0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC) with 100 ETH"
         echo "L2 deployment complete!"
     depends_on:
@@ -509,12 +512,23 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node@sha256:97853e10aea44c86567b8ca86322972c493f6d3a79d31e3981f9bfccb54eab2d
     container_name: op-node
     entrypoint: ["/bin/sh", "-c"]
+    environment:
+      - L1_CHAIN_CONFIG=${L1_CHAIN_CONFIG:-/genesis-data/metadata/genesis.json}
     command:
     - |
-      sed 's/"terminalTotalDifficultyPassed".*//' /genesis-data/metadata/genesis.json > /tmp/l1-genesis.json
+      if echo "$$L1_CHAIN_CONFIG" | grep -q '^http'; then
+        wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
+        sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
+        L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+      elif [ -f "$$L1_CHAIN_CONFIG" ]; then
+        sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
+        L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+      else
+        L1_CONFIG_FLAG=""
+      fi
       exec op-node \
-        --l1=http://geth:8545 \
-        --l1.beacon=http://lighthouse:5052 \
+        --l1=${L1_RPC_URL:-http://geth:8545} \
+        --l1.beacon=${L1_BEACON_URL:-http://lighthouse:5052} \
         --l2=http://op-reth:9551 \
         --l2.jwt-secret=/l2-data/jwt.txt \
         --rollup.config=/l2-data/rollup.json \
@@ -525,7 +539,7 @@ services:
         --p2p.disable \
         --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
         --l1.trustrpc \
-        --rollup.l1-chain-config=/tmp/l1-genesis.json
+        $$L1_CONFIG_FLAG
     ports:
       - "8547:8547"
     volumes:
@@ -534,8 +548,6 @@ services:
     depends_on:
       l2-el-ready:
         condition: service_completed_successfully
-      geth:
-        condition: service_healthy
     restart: unless-stopped
 
   # L2 Batch Submitter - op-batcher
@@ -544,7 +556,7 @@ services:
     container_name: op-batcher
     command:
       - op-batcher
-      - --l1-eth-rpc=http://geth:8545
+      - --l1-eth-rpc=${L1_RPC_URL:-http://geth:8545}
       - --l2-eth-rpc=http://op-reth:9545
       - --rollup-rpc=http://op-node:8547
       - --private-key=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
@@ -567,17 +579,14 @@ services:
   l1-el-ready:
     image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
     container_name: l1-el-ready
-    depends_on:
-      geth:
-        condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         echo "Waiting for L1 EL to be ready..."
         while true; do
-          BLOCK=$$(cast block-number --rpc-url http://geth:8545 2>/dev/null || echo "0")
+          BLOCK=$$(cast block-number --rpc-url ${L1_RPC_URL:-http://geth:8545} 2>/dev/null || echo "0")
           if [ "$$BLOCK" != "0" ] && [ -n "$$BLOCK" ]; then
-            if cast logs --from-block 1 --to-block 1 --rpc-url http://geth:8545 >/dev/null 2>&1; then
+            if cast logs --from-block 1 --to-block 1 --rpc-url ${L1_RPC_URL:-http://geth:8545} >/dev/null 2>&1; then
               echo "L1 EL is ready. Block: $$BLOCK, indexing complete."
               exit 0
             fi
