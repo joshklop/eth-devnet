@@ -104,6 +104,7 @@ services:
       - --disable-discovery
       - --disable-peer-scoring
       - --staking
+      - --supernode
       - --allow-insecure-genesis-sync
       - --debug-level=info
     ports:
