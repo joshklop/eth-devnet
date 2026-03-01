@@ -185,6 +185,7 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:f6291e537bd9de2c3bb415cace47812b3cc19f87
     platform: linux/amd64
     container_name: blob-archiver
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -211,6 +212,7 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:f6291e537bd9de2c3bb415cace47812b3cc19f87
     platform: linux/amd64
     container_name: blob-api
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -245,6 +247,7 @@ services:
   deploy-deterministic-deployer:
     image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
     container_name: deploy-deterministic-deployer
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -265,12 +268,12 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
     platform: linux/amd64
     container_name: bootstrap-superchain
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         echo "=== Bootstrap Superchain ==="
         op-deployer bootstrap superchain \
-          --log-level=debug \
           --l1-rpc-url=${L1_RPC_URL:-http://geth:8545} \
           --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
           --outfile=/deployments/superchain.json \
@@ -290,6 +293,7 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
     platform: linux/amd64
     container_name: bootstrap-implementations
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -322,6 +326,7 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
     platform: linux/amd64
     container_name: l2-deploy-init
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -386,6 +391,7 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
     platform: linux/amd64
     container_name: l2-deploy-apply
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -406,6 +412,7 @@ services:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
     platform: linux/amd64
     container_name: l2-deploy-inspect
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -431,6 +438,7 @@ services:
   l2-fund-accounts:
     image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
     container_name: l2-fund-accounts
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -456,6 +464,7 @@ services:
   op-reth-init:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v1.11.0
     container_name: op-reth-init
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -471,6 +480,7 @@ services:
   op-reth:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v1.11.0
     container_name: op-reth
+    profiles: ["l2"]
     command:
       - node
       - --chain=/l2-data/genesis.json
@@ -511,6 +521,7 @@ services:
   op-node:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node@sha256:97853e10aea44c86567b8ca86322972c493f6d3a79d31e3981f9bfccb54eab2d
     container_name: op-node
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     environment:
       - L1_CHAIN_CONFIG=${L1_CHAIN_CONFIG:-/genesis-data/metadata/genesis.json}
@@ -554,6 +565,7 @@ services:
   op-batcher:
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher@sha256:b737345560e429fbc3a5549a4a396d684108ca4147ec069e2ec5e2b752cb8447
     container_name: op-batcher
+    profiles: ["l2"]
     command:
       - op-batcher
       - --l1-eth-rpc=${L1_RPC_URL:-http://geth:8545}
@@ -579,6 +591,7 @@ services:
   l1-el-ready:
     image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
     container_name: l1-el-ready
+    profiles: ["l1"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -601,6 +614,7 @@ services:
   l2-el-ready:
     image: ghcr.io/foundry-rs/foundry@sha256:9e591221051112fe0bb530abcaba67f43f01ebbd12a94a8632d570d5e065a8bf
     container_name: l2-el-ready
+    profiles: ["l2"]
     depends_on:
       op-reth:
         condition: service_started

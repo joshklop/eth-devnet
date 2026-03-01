@@ -1,6 +1,6 @@
 # eth-devnet
 
-OP Stack L2 devnet using Docker Compose. Supports two modes: a self-contained L1+L2 devnet, or an L2-only deployment against an external L1.
+OP Stack L2 devnet using Docker Compose. Supports three modes via profiles: L1-only, L2-only, or a full L1+L2 devnet.
 
 ## Quick Start
 
@@ -9,10 +9,18 @@ OP Stack L2 devnet using Docker Compose. Supports two modes: a self-contained L1
 Spins up a local L1 (Geth + Lighthouse) and deploys a fresh OP Stack L2 on top of it. No configuration needed.
 
 ```bash
-docker compose --profile l1 up -d
+docker compose --profile l1 --profile l2 up -d
 ```
 
-This starts all 22 services: L1 execution/consensus, validator, contract deployment pipeline, and the L2 stack (op-reth, op-node, op-batcher).
+This starts all services: L1 execution/consensus, validator, contract deployment pipeline, and the L2 stack (op-reth, op-node, op-batcher).
+
+### L1-Only
+
+Runs just the local Ethereum L1 chain (Geth + Lighthouse + validator). Useful for L1 development or testing without the OP Stack.
+
+```bash
+docker compose --profile l1 up -d
+```
 
 ### L2-Only (External L1)
 
@@ -24,7 +32,7 @@ L1_BEACON_URL=http://my-l1:5052 \
 L1_CHAIN_CONFIG=http://my-l1:8080/genesis.json \
 L2_CHAIN_ID=1010101 \
 DEPLOYER_ACCOUNT=0xYOUR_PRIVATE_KEY \
-docker compose up -d
+docker compose --profile l2 up -d
 ```
 
 Only L2 services start. The deploy pipeline connects to the external L1 to deploy contracts, then boots the L2 chain.
@@ -43,9 +51,10 @@ Only L2 services start. The deploy pipeline connects to the external L1 to deplo
 
 | Mode | Required Variables |
 |------|--------------------|
-| Full devnet (`--profile l1`) | None |
-| L2-only, well-known L1 (mainnet/sepolia) | `L1_RPC_URL`, `L1_BEACON_URL`, `DEPLOYER_ACCOUNT` |
-| L2-only, custom/devnet L1 | `L1_RPC_URL`, `L1_BEACON_URL`, `L1_CHAIN_CONFIG`, `DEPLOYER_ACCOUNT` |
+| Full devnet (`--profile l1 --profile l2`) | None |
+| L1-only (`--profile l1`) | None |
+| L2-only, well-known L1 (`--profile l2`) | `L1_RPC_URL`, `L1_BEACON_URL`, `DEPLOYER_ACCOUNT` |
+| L2-only, custom/devnet L1 (`--profile l2`) | `L1_RPC_URL`, `L1_BEACON_URL`, `L1_CHAIN_CONFIG`, `DEPLOYER_ACCOUNT` |
 
 ## Services
 
@@ -63,7 +72,7 @@ Only started when using `--profile l1`. Not needed when pointing at an external 
 | `validator-keygen` | Generates validator keystores |
 | `genesis-server` | Serves L1 genesis metadata over HTTP (port 8080) |
 
-### L2 Services (always active)
+### L2 Services (profile: `l2`)
 
 | Service | Description |
 |---------|-------------|
@@ -102,7 +111,7 @@ Only started when using `--profile l1`. Not needed when pointing at an external 
 
 ```bash
 # Stop everything and remove volumes
-docker compose --profile l1 down -v
+docker compose --profile l1 --profile l2 down -v
 ```
 
 ## Test Accounts
