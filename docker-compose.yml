@@ -6,6 +6,7 @@ configs:
       export EL_AND_CL_MNEMONIC='test test test test test test test test test test test junk'
       export GENESIS_TIMESTAMP=$(date +%s)
       export GENESIS_DELAY=20
+      export GLOAS_FORK_EPOCH=1
 
 services:
   # Genesis generator - creates all config files
@@ -22,7 +23,7 @@ services:
 
   # Execution Layer - Geth
   geth:
-    image: ethereum/client-go@sha256:84e72946ce7034e9e4623385fe2ad15d995135e5cf61ae80bf32bb2a525f77ed
+    image: ethpandaops/geth:bal-devnet-2
     container_name: geth
     profiles: ["l1"]
     command:
@@ -69,7 +70,7 @@ services:
 
   # Initialize Geth
   geth-init:
-    image: ethereum/client-go@sha256:84e72946ce7034e9e4623385fe2ad15d995135e5cf61ae80bf32bb2a525f77ed
+    image: ethpandaops/geth:bal-devnet-2
     container_name: geth-init
     profiles: ["l1"]
     entrypoint: ["/bin/sh", "-c"]
@@ -87,7 +88,7 @@ services:
 
   # Consensus Layer - Lighthouse
   lighthouse:
-    image: sigp/lighthouse@sha256:4892f483320f3920e00f61d08fdf3b38db56377562bdef0d1832ea8add09b9e8
+    image: ethpandaops/lighthouse:bal-devnet-2
     container_name: lighthouse
     profiles: ["l1"]
     command:
@@ -120,7 +121,7 @@ services:
 
   # Generate validator keys
   validator-keygen:
-    image: ethpandaops/ethereum-genesis-generator:5.2.2
+    image: ethpandaops/ethereum-genesis-generator:5.3.0
     container_name: validator-keygen
     profiles: ["l1"]
     entrypoint: ["/bin/bash", "-c"]
@@ -158,7 +159,7 @@ services:
 
   # Validator Client - Lighthouse
   lighthouse-vc:
-    image: sigp/lighthouse@sha256:4892f483320f3920e00f61d08fdf3b38db56377562bdef0d1832ea8add09b9e8
+    image: ethpandaops/lighthouse:bal-devnet-2
     container_name: lighthouse-vc
     profiles: ["l1"]
     command:
@@ -579,6 +580,9 @@ services:
       - --num-confirmations=1
       - --sub-safety-margin=4
       - --wait-node-sync=false
+      # NOTE: DA throttling is disabled because op-reth doesn't support the
+      # miner_setMaxDASize RPC that the batcher's throttle controller requires.
+      - --throttle.unsafe-da-bytes-lower-threshold=0
       - --rpc.addr=0.0.0.0
       - --rpc.port=8548
     ports:
