@@ -548,7 +548,7 @@ services:
         L1_CONFIG_FLAG=""
       fi
       exec op-node \
-        --l1=${L1_RPC_URL:-http://geth:8545} \
+        --l1=${L1_RPC_URL:-ws://geth:8546} \
         --l1.beacon=${L1_BEACON_URL:-http://lighthouse:5052} \
         --l2=http://op-reth:9551 \
         --l2.jwt-secret=/l2-data/jwt.txt \
