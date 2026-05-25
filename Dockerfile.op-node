@@ -1,0 +1,31 @@
+# Minimal op-node build for eth-devnet.
+#
+# Builds the op-node binary from a local checkout of the optimism monorepo
+# whose go.mod replace points at a sibling local checkout of go-ethereum
+# (op-geth). The compose build context is /home/joshklop/repos so both
+# subdirectories are visible to BuildKit, matching the layout the
+# `replace github.com/ethereum/go-ethereum => ../go-ethereum` line in
+# optimism/go.mod expects.
+
+FROM golang:1.24.13-alpine3.22 AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /repos
+COPY optimism /repos/optimism
+COPY go-ethereum /repos/go-ethereum
+
+WORKDIR /repos/optimism
+
+ARG GIT_COMMIT=local
+ARG GIT_DATE=0
+
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath \
+      -ldflags "-X main.GitCommit=${GIT_COMMIT} -X main.GitDate=${GIT_DATE} -X github.com/ethereum-optimism/optimism/op-node/version.Meta=local" \
+      -o /usr/local/bin/op-node ./op-node/cmd
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates jq curl
+COPY --from=builder /usr/local/bin/op-node /usr/local/bin/op-node
+ENTRYPOINT ["op-node"]

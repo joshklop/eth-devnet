@@ -528,8 +528,16 @@ services:
       retries: 30
 
   # L2 Consensus / Derivation - op-node
+  # Built locally from /home/joshklop/repos/optimism so the runtime tracks
+  # trunk op-node patched against trunk op-geth (sibling go-ethereum checkout
+  # via a path replace in optimism/go.mod). The patched op-geth carries the
+  # EIP-7928 BlockAccessListHash header field with JSON tag
+  # `blockAccessListHash` to match what ethpandaops/geth:bal-devnet-7 emits.
   op-node:
-    image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node@sha256:97853e10aea44c86567b8ca86322972c493f6d3a79d31e3981f9bfccb54eab2d
+    build:
+      context: /home/joshklop/repos
+      dockerfile: eth-devnet/Dockerfile.op-node
+    image: op-stack-go/op-node:local
     container_name: op-node
     profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
