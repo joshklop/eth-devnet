@@ -135,6 +135,14 @@ services:
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
+        # eth2-val-tools refuses to overwrite an existing keys/assignments
+        # directory; skip when the keys are already present so `docker compose
+        # up -d` is idempotent (re-running `up` after the first `up` would
+        # otherwise mark this service as failed).
+        if [ -d /validator-keys/keys/keys ]; then
+          echo "Validator keys already exist, skipping keygen."
+          exit 0
+        fi
         source /defaults/defaults.env
         source /values.env
         eth2-val-tools \
@@ -527,48 +535,56 @@ services:
       timeout: 3s
       retries: 30
 
-  # L2 Consensus / Derivation - op-node
-  # Built locally from /home/joshklop/repos/optimism so the runtime tracks
-  # trunk op-node patched against trunk op-geth (sibling go-ethereum checkout
-  # via a path replace in optimism/go.mod). The patched op-geth carries the
-  # EIP-7928 BlockAccessListHash header field with JSON tag
-  # `blockAccessListHash` to match what ethpandaops/geth:bal-devnet-7 emits.
+  # L2 Consensus / Derivation - kona-node
+  # Built locally from /home/joshklop/repos/optimism/rust so we run the trunk
+  # kona-node binary. kona-node uses alloy-consensus's Header type which
+  # already carries the EIP-7928 BlockAccessListHash field with JSON tag
+  # `blockAccessListHash` (via `#[serde(rename_all = "camelCase")]`), so the
+  # post-Gloas L1 header decode works out of the box and we don't need the
+  # op-geth JSON tag patch on this side.
   op-node:
     build:
-      context: /home/joshklop/repos
-      dockerfile: eth-devnet/Dockerfile.op-node
-    image: op-stack-go/op-node:local
+      context: /home/joshklop/repos/optimism
+      dockerfile: /home/joshklop/repos/eth-devnet/Dockerfile.kona-node
+    image: kona-node:local
     container_name: op-node
     profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     environment:
       - L1_CHAIN_CONFIG=${L1_CHAIN_CONFIG:-/genesis-data/metadata/genesis.json}
+      - RUST_LOG=${RUST_LOG:-info,kona_node=info,kona_derive=info,kona_engine=info}
     command:
     - |
+      # kona-node's `--l1-config-file` deserializes the file straight into
+      # `alloy_genesis::ChainConfig`, so we strip the surrounding genesis
+      # wrapper (alloc/timestamp/etc) and keep only `.config`.
       if echo "$$L1_CHAIN_CONFIG" | grep -q '^http'; then
         wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
-        sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
-        L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+        jq '.config' /tmp/l1-genesis-raw.json > /tmp/l1-config.json
+        L1_CONFIG_FLAG="--l1-config-file=/tmp/l1-config.json"
       elif [ -f "$$L1_CHAIN_CONFIG" ]; then
-        sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
-        L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+        jq '.config' "$$L1_CHAIN_CONFIG" > /tmp/l1-config.json
+        L1_CONFIG_FLAG="--l1-config-file=/tmp/l1-config.json"
       else
         L1_CONFIG_FLAG=""
       fi
-      exec op-node \
-        --l1=${L1_RPC_URL:-ws://geth:8546} \
-        --l1.beacon=${L1_BEACON_URL:-http://lighthouse:5052} \
-        --l2=http://op-reth:9551 \
-        --l2.jwt-secret=/l2-data/jwt.txt \
-        --rollup.config=/l2-data/rollup.json \
-        --rpc.addr=0.0.0.0 \
-        --rpc.port=8547 \
-        --sequencer.enabled \
-        --sequencer.l1-confs=0 \
-        --p2p.disable \
-        --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
-        --l1.trustrpc \
-        $$L1_CONFIG_FLAG
+      exec kona-node \
+        --chain=${L2_CHAIN_ID:-10200} \
+        node \
+          --mode=Sequencer \
+          --l1-eth-rpc=${L1_RPC_URL:-http://geth:8545} \
+          --l1-beacon=${L1_BEACON_URL:-http://lighthouse:5052} \
+          --l2-engine-rpc=http://op-reth:9551 \
+          --l2-engine-jwt-secret=/l2-data/jwt.txt \
+          --l2-config-file=/l2-data/rollup.json \
+          --rpc.addr=0.0.0.0 \
+          --port=8547 \
+          --sequencer.l1-confs=0 \
+          --p2p.no-discovery \
+          --p2p.no-bootstore \
+          --p2p.scoring=Off \
+          --p2p.sequencer.key=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+          $$L1_CONFIG_FLAG
     ports:
       - "8547:8547"
     volumes:
