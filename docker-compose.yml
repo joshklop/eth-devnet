@@ -263,19 +263,16 @@ services:
     platform: linux/amd64
     container_name: bootstrap-superchain
     profiles: ["l2"]
-    entrypoint: ["/bin/sh", "-c"]
     command:
-      - |
-        echo "=== Bootstrap Superchain ==="
-        op-deployer bootstrap superchain \
-          --l1-rpc-url=${L1_RPC_URL:-http://geth:8545} \
-          --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
-          --outfile=/deployments/superchain.json \
-          --superchain-proxy-admin-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-          --protocol-versions-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-          --guardian=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-        echo "Superchain bootstrap complete:"
-        cat /deployments/superchain.json
+      - op-deployer
+      - bootstrap
+      - superchain
+      - --l1-rpc-url=${L1_RPC_URL:-http://geth:8545}
+      - --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      - --outfile=/deployments/superchain.json
+      - --superchain-proxy-admin-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - --protocol-versions-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - --guardian=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
     volumes:
       - deployments:/deployments
     depends_on:
