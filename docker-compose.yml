@@ -182,6 +182,7 @@ services:
 
   # Blob Archiver - archives blobs from the beacon chain to local storage
   blob-archiver:
+    # TODO use the image with the fix
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:f6291e537bd9de2c3bb415cace47812b3cc19f87
     platform: linux/amd64
     container_name: blob-archiver
@@ -290,6 +291,7 @@ services:
 
   # Bootstrap OP Stack implementation contracts on L1
   bootstrap-implementations:
+    # TODO we should find a new version of op-deployer
     image: us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer@sha256:793b0b2d306a9b102fb329c83ab1bc08e0c82627ff512e817914062654ace202
     platform: linux/amd64
     container_name: bootstrap-implementations
@@ -526,31 +528,31 @@ services:
     environment:
       - L1_CHAIN_CONFIG=${L1_CHAIN_CONFIG:-/genesis-data/metadata/genesis.json}
     command:
-    - |
-      if echo "$$L1_CHAIN_CONFIG" | grep -q '^http'; then
-        wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
-        sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
-        L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
-      elif [ -f "$$L1_CHAIN_CONFIG" ]; then
-        sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
-        L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
-      else
-        L1_CONFIG_FLAG=""
-      fi
-      exec op-node \
-        --l1=${L1_RPC_URL:-http://geth:8545} \
-        --l1.beacon=${L1_BEACON_URL:-http://lighthouse:5052} \
-        --l2=http://op-reth:9551 \
-        --l2.jwt-secret=/l2-data/jwt.txt \
-        --rollup.config=/l2-data/rollup.json \
-        --rpc.addr=0.0.0.0 \
-        --rpc.port=8547 \
-        --sequencer.enabled \
-        --sequencer.l1-confs=0 \
-        --p2p.disable \
-        --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
-        --l1.trustrpc \
-        $$L1_CONFIG_FLAG
+      - |
+        if echo "$$L1_CHAIN_CONFIG" | grep -q '^http'; then
+          wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
+          sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
+          L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+        elif [ -f "$$L1_CHAIN_CONFIG" ]; then
+          sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
+          L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+        else
+          L1_CONFIG_FLAG=""
+        fi
+        exec op-node \
+          --l1=${L1_RPC_URL:-http://geth:8545} \
+          --l1.beacon=${L1_BEACON_URL:-http://lighthouse:5052} \
+          --l2=http://op-reth:9551 \
+          --l2.jwt-secret=/l2-data/jwt.txt \
+          --rollup.config=/l2-data/rollup.json \
+          --rpc.addr=0.0.0.0 \
+          --rpc.port=8547 \
+          --sequencer.enabled \
+          --sequencer.l1-confs=0 \
+          --p2p.disable \
+          --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+          --l1.trustrpc \
+          $$L1_CONFIG_FLAG
     ports:
       - "8547:8547"
     volumes:
