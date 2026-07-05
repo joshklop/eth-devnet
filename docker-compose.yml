@@ -192,23 +192,70 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # blob-archiver's image (Chainguard "static") ships no shell/coreutils, so a
+  # static busybox is extracted here and bind-mounted into it below to give it
+  # just enough of a shell to read the resolved genesis root and exec itself.
+  # Also chowns blob-data to the image's nonroot uid (65532), since named
+  # volumes default to root-owned and the image can't write to /data otherwise.
+  busybox-tools:
+    image: busybox:musl
+    platform: linux/amd64
+    container_name: busybox-tools
+    profiles: ["l2"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cp /bin/busybox /tools/busybox
+        chown -R 65532:65532 /data
+    volumes:
+      - blob-shared:/tools
+      - blob-data:/data
+
+  # L1 Beacon readiness check - exits when lighthouse's beacon HTTP API responds
+  l1-beacon-ready:
+    image: *python-image
+    container_name: l1-beacon-ready
+    profiles: ["l2"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for lighthouse beacon API..."
+        until wget -qO /dev/null ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/genesis 2>/dev/null; do
+          sleep 2
+        done
+        echo "Lighthouse beacon API is ready."
+
+  # Resolves the L1 beacon genesis block root and writes it to a shared volume.
+  # blob-archiver needs this value but its image has no shell to compute it.
+  l1-beacon-root:
+    image: *python-image
+    container_name: l1-beacon-root
+    profiles: ["l2"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        wget -qO /tmp/genesis.json ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/genesis
+        GENESIS_ROOT=$$(sed 's/.*"root":"\([^"]*\)".*/\1/' /tmp/genesis.json)
+        echo "Genesis block root: $$GENESIS_ROOT"
+        echo -n "$$GENESIS_ROOT" > /shared/genesis-root.txt
+    volumes:
+      - blob-shared:/shared
+    depends_on:
+      l1-beacon-ready:
+        condition: service_completed_successfully
+
   # Blob Archiver - archives blobs from the beacon chain to local storage
   blob-archiver:
     image: *blob-archiver-image
     platform: linux/amd64
     container_name: blob-archiver
     profiles: ["l2"]
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: ["/shared/busybox", "sh", "-c"]
     command:
       - |
-        echo "Waiting for lighthouse beacon API..."
-        until wget -qO /tmp/genesis.json ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/genesis 2>/dev/null; do
-          sleep 2
-        done
-        GENESIS_ROOT=$$(sed 's/.*"root":"\([^"]*\)".*/\1/' /tmp/genesis.json)
-        echo "Genesis block root: $$GENESIS_ROOT"
-        export BLOB_ARCHIVER_ORIGIN_BLOCK=$$GENESIS_ROOT
-        exec blob-archiver
+        export BLOB_ARCHIVER_ORIGIN_BLOCK=$$(/shared/busybox cat /shared/genesis-root.txt)
+        echo "Using origin block: $$BLOB_ARCHIVER_ORIGIN_BLOCK"
+        exec /usr/local/bin/blob-archiver
     environment:
       - BLOB_ARCHIVER_L1_BEACON_HTTP=${L1_BEACON_URL:-http://lighthouse:5052}
       - BLOB_ARCHIVER_DATA_STORE=file
@@ -217,22 +264,22 @@ services:
       - BLOB_ARCHIVER_METRICS_PORT=7300
     volumes:
       - blob-data:/data
+      - blob-shared:/shared:ro
+    depends_on:
+      busybox-tools:
+        condition: service_completed_successfully
+      l1-beacon-root:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # Blob API - serves archived blobs over HTTP for OP Stack derivation
+  # Needs no computed values, so it execs its binary directly - no shell needed.
   blob-api:
     image: *blob-archiver-image
     platform: linux/amd64
     container_name: blob-api
     profiles: ["l2"]
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Waiting for lighthouse beacon API..."
-        until wget -qO /dev/null ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/head 2>/dev/null; do
-          sleep 2
-        done
-        exec blob-api
+    command: ["/usr/local/bin/blob-api"]
     environment:
       - BLOB_API_L1_BEACON_HTTP=${L1_BEACON_URL:-http://lighthouse:5052}
       - BLOB_API_DATA_STORE=file
@@ -243,12 +290,15 @@ services:
       - "5058:8000"
     volumes:
       - blob-data:/data
+      - blob-shared:/shared:ro
     depends_on:
+      busybox-tools:
+        condition: service_completed_successfully
       blob-archiver:
         condition: service_started
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO", "-", "http://localhost:8000/healthz"]
+      test: ["CMD", "/shared/busybox", "wget", "-qO", "-", "http://localhost:8000/healthz"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -271,7 +321,6 @@ services:
       - --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
       - --outfile=/deployments/superchain.json
       - --superchain-proxy-admin-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-      - --protocol-versions-owner=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
       - --guardian=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
     volumes:
       - deployments:/deployments
@@ -290,17 +339,14 @@ services:
       - |
         echo "=== Bootstrap Implementations ==="
         SUPERCHAIN_CONFIG_PROXY=$$(grep '"superchainConfigProxyAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
-        PROTOCOL_VERSIONS_PROXY=$$(grep '"protocolVersionsProxyAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
         SUPERCHAIN_PROXY_ADMIN=$$(grep '"proxyAdminAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
         echo "SuperchainConfigProxy: $$SUPERCHAIN_CONFIG_PROXY"
-        echo "ProtocolVersionsProxy: $$PROTOCOL_VERSIONS_PROXY"
         echo "SuperchainProxyAdmin: $$SUPERCHAIN_PROXY_ADMIN"
         op-deployer bootstrap implementations \
           --l1-rpc-url=${L1_RPC_URL:-http://geth:8545} \
           --private-key=${DEPLOYER_ACCOUNT:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80} \
           --outfile=/deployments/implementations.json \
           --superchain-config-proxy=$$SUPERCHAIN_CONFIG_PROXY \
-          --protocol-versions-proxy=$$PROTOCOL_VERSIONS_PROXY \
           --superchain-proxy-admin=$$SUPERCHAIN_PROXY_ADMIN \
           --upgrade-controller=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
           --challenger=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
@@ -628,6 +674,7 @@ volumes:
   lighthouse-data:
   validator-keys:
   blob-data:
+  blob-shared:
   deployments:
   l2-data:
   op-reth-data:
