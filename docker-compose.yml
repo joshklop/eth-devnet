@@ -4,7 +4,7 @@ x-images:
   lighthouse: &lighthouse-image ethpandaops/lighthouse:glamsterdam-devnet-6
   python: &python-image python:3-alpine
   blob-archiver: &blob-archiver-image us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:edc32e415d15aadfe381b4992be327486734d243
-  foundry: &foundry-image ghcr.io/foundry-rs/foundry:1.7.1
+  foundry: &foundry-image ghcr.io/foundry-rs/foundry:v1.7.1
   op-deployer: &op-deployer-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer:v0.7.0-rc.1
   op-reth: &op-reth-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v2.3.3
   op-node: &op-node-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.19.1
