@@ -192,11 +192,14 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # blob-archiver's image (Chainguard "static") ships no shell/coreutils, so a
-  # static busybox is extracted here and bind-mounted into it below to give it
-  # just enough of a shell to read the resolved genesis root and exec itself.
-  # Also chowns blob-data to the image's nonroot uid (65532), since named
-  # volumes default to root-owned and the image can't write to /data otherwise.
+  # Several images here (blob-archiver, blob-api, op-node) are Chainguard
+  # "static" builds with no shell/coreutils, but their entrypoints need one
+  # (to read a resolved value or preprocess a file before exec'ing the real
+  # binary). A static busybox is extracted here into a shared volume so it can
+  # be bind-mounted into those containers as a minimal shell.
+  # Also chowns blob-data to the blob-archiver image's nonroot uid (65532),
+  # since named volumes default to root-owned and the image can't write to
+  # /data otherwise.
   busybox-tools:
     image: busybox:musl
     platform: linux/amd64
@@ -205,10 +208,11 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         cp /bin/busybox /tools/busybox
         chown -R 65532:65532 /data
     volumes:
-      - blob-shared:/tools
+      - shell-tools:/tools
       - blob-data:/data
 
   # L1 Beacon readiness check - exits when lighthouse's beacon HTTP API responds
@@ -219,6 +223,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         echo "Waiting for lighthouse beacon API..."
         until wget -qO /dev/null ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/genesis 2>/dev/null; do
           sleep 2
@@ -234,12 +239,13 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         wget -qO /tmp/genesis.json ${L1_BEACON_URL:-http://lighthouse:5052}/eth/v1/beacon/headers/genesis
         GENESIS_ROOT=$$(sed 's/.*"root":"\([^"]*\)".*/\1/' /tmp/genesis.json)
         echo "Genesis block root: $$GENESIS_ROOT"
         echo -n "$$GENESIS_ROOT" > /shared/genesis-root.txt
     volumes:
-      - blob-shared:/shared
+      - shell-tools:/shared
     depends_on:
       l1-beacon-ready:
         condition: service_completed_successfully
@@ -253,6 +259,7 @@ services:
     entrypoint: ["/shared/busybox", "sh", "-c"]
     command:
       - |
+        set -e
         export BLOB_ARCHIVER_ORIGIN_BLOCK=$$(/shared/busybox cat /shared/genesis-root.txt)
         echo "Using origin block: $$BLOB_ARCHIVER_ORIGIN_BLOCK"
         exec /usr/local/bin/blob-archiver
@@ -264,7 +271,7 @@ services:
       - BLOB_ARCHIVER_METRICS_PORT=7300
     volumes:
       - blob-data:/data
-      - blob-shared:/shared:ro
+      - shell-tools:/shared:ro
     depends_on:
       busybox-tools:
         condition: service_completed_successfully
@@ -290,7 +297,7 @@ services:
       - "5058:8000"
     volumes:
       - blob-data:/data
-      - blob-shared:/shared:ro
+      - shell-tools:/shared:ro
     depends_on:
       busybox-tools:
         condition: service_completed_successfully
@@ -337,6 +344,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         echo "=== Bootstrap Implementations ==="
         SUPERCHAIN_CONFIG_PROXY=$$(grep '"superchainConfigProxyAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
         SUPERCHAIN_PROXY_ADMIN=$$(grep '"proxyAdminAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
@@ -367,9 +375,12 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         echo "=== L2 Deploy Init ==="
-        OPCM_ADDRESS=$$(grep '"opcmAddress"' /deployments/implementations.json | sed 's/.*: *"\([^"]*\)".*/\1/')
+        OPCM_ADDRESS=$$(grep '"opcmV2Address"' /deployments/implementations.json | sed 's/.*: *"\([^"]*\)".*/\1/')
+        SUPERCHAIN_CONFIG_PROXY=$$(grep '"superchainConfigProxyAddress"' /deployments/superchain.json | sed 's/.*: *"\([^"]*\)".*/\1/')
         echo "OPCM address: $$OPCM_ADDRESS"
+        echo "Superchain config proxy: $$SUPERCHAIN_CONFIG_PROXY"
         CHAIN_ID_HEX=$$(wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
           --header='Content-Type: application/json' ${L1_RPC_URL:-http://geth:8545} | \
           sed 's/.*"result":"\([^"]*\)".*/\1/')
@@ -393,6 +404,7 @@ services:
         fundDevAccounts = true
         useInterop = false
         opcmAddress = "$$OPCM_ADDRESS"
+        superchainConfigProxy = "$$SUPERCHAIN_CONFIG_PROXY"
 
         [[chains]]
         id = "$$L2_CHAIN_ID_HEX"
@@ -432,6 +444,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         echo "=== L2 Deploy Apply ==="
         op-deployer apply \
           --workdir /l2-data \
@@ -453,6 +466,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         echo "=== L2 Deploy Inspect ==="
         op-deployer inspect genesis \
           --workdir /l2-data \
@@ -479,6 +493,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         echo "=== Funding L2 Accounts ==="
         cast send 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
           --value 100ether \
@@ -555,21 +570,24 @@ services:
       retries: 30
 
   # L2 Consensus / Derivation - op-node
+  # op-node's image is also Chainguard "static" (no shell) - same borrowed-
+  # busybox trick as blob-archiver.
   op-node:
     image: *op-node-image
     container_name: op-node
     profiles: ["l2"]
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: ["/shared/busybox", "sh", "-c"]
     environment:
       - L1_CHAIN_CONFIG=${L1_CHAIN_CONFIG:-/genesis-data/metadata/genesis.json}
     command:
       - |
-        if echo "$$L1_CHAIN_CONFIG" | grep -q '^http'; then
-          wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
-          sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
+        set -e
+        if echo "$$L1_CHAIN_CONFIG" | /shared/busybox grep -q '^http'; then
+          /shared/busybox wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
+          /shared/busybox sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
           L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
         elif [ -f "$$L1_CHAIN_CONFIG" ]; then
-          sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
+          /shared/busybox sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
           L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
         else
           L1_CONFIG_FLAG=""
@@ -593,7 +611,10 @@ services:
     volumes:
       - l2-data:/l2-data:ro
       - genesis-data:/genesis-data:ro
+      - shell-tools:/shared:ro
     depends_on:
+      busybox-tools:
+        condition: service_completed_successfully
       l2-el-ready:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -674,7 +695,7 @@ volumes:
   lighthouse-data:
   validator-keys:
   blob-data:
-  blob-shared:
+  shell-tools:
   deployments:
   l2-data:
   op-reth-data:
