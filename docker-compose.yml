@@ -7,7 +7,7 @@ x-images:
   foundry: &foundry-image ghcr.io/foundry-rs/foundry:v1.7.1
   op-deployer: &op-deployer-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer:v0.7.0-rc.1
   op-reth: &op-reth-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v2.3.3
-  op-node: &op-node-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.19.1
+  op-node: &op-node-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.19.2
   op-batcher: &op-batcher-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:v1.16.10
 
 configs:
@@ -156,6 +156,7 @@ services:
   genesis-server:
     image: *python-image
     container_name: genesis-server
+    platform: linux/amd64
     profiles: ["l1"]
     command: python -m http.server 8080 --directory /genesis-data/metadata
     ports:
@@ -219,6 +220,7 @@ services:
   l1-beacon-ready:
     image: *python-image
     container_name: l1-beacon-ready
+    platform: linux/amd64
     profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -235,6 +237,7 @@ services:
   l1-beacon-root:
     image: *python-image
     container_name: l1-beacon-root
+    platform: linux/amd64
     profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -305,7 +308,15 @@ services:
         condition: service_started
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "/shared/busybox", "wget", "-qO", "-", "http://localhost:8000/healthz"]
+      test:
+        [
+          "CMD",
+          "/shared/busybox",
+          "wget",
+          "-qO",
+          "-",
+          "http://localhost:8000/healthz",
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
