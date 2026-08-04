@@ -1,31 +1,44 @@
 x-images:
-  ethereum-genesis-generator: &ethereum-genesis-generator-image ethpandaops/ethereum-genesis-generator:6.1.2
-  geth: &geth-image ethpandaops/geth:glamsterdam-devnet-6
-  lighthouse: &lighthouse-image ethpandaops/lighthouse:glamsterdam-devnet-6
+  # Match Plataberget (glamsterdam-devnet-8), the L1 used by glamsterdam-def-0.
+  ethereum-genesis-generator: &ethereum-genesis-generator-image ethpandaops/ethereum-genesis-generator:6.2.0
+  geth: &geth-image ethpandaops/geth:glamsterdam-devnet-8
+  teku: &teku-image ethpandaops/teku:glamsterdam-devnet-8
   python: &python-image python:3-alpine
   blob-archiver: &blob-archiver-image us-docker.pkg.dev/oplabs-tools-artifacts/images/blob-archiver:edc32e415d15aadfe381b4992be327486734d243
   foundry: &foundry-image ghcr.io/foundry-rs/foundry:v1.7.1
-  op-deployer: &op-deployer-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer:v0.7.0-rc.1
-  op-reth: &op-reth-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v2.3.3
-  op-node: &op-node-image op-node:glamsterdam-fix
-  op-batcher: &op-batcher-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:v1.16.10
+  # Match devnets-private/dev/glamsterdam-defense-0/manifest.yaml.
+  op-deployer: &op-deployer-image ${OP_DEPLOYER_IMAGE:-us-docker.pkg.dev/oplabs-tools-artifacts/images/op-deployer:v0.7.1}
+  op-reth: &op-reth-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-reth:v2.4.2
+  op-node: &op-node-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.19.5-rc.2
+  op-batcher: &op-batcher-image us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:71b5fe0865fbd7a798f9b5da7602ec7b0903b9fb
 
 configs:
   values-env:
     content: |
-      export SECONDS_PER_SLOT=6
-      # Glamsterdam (Gloas/ePBS) needs a full Payload-Timeliness Committee. Under the
-      # mainnet preset that is PTC_SIZE(512) * SLOTS_PER_EPOCH(32) = 16384 active
-      # validators; with fewer, the CL cannot advance the state across the Gloas epoch
-      # boundary (BeaconStateError InvalidIndicesCount) and the L1 halts at the fork.
+      # Match Plataberget's chain identity, fork versions, slot duration, gas limit,
+      # compounding credentials, and BPO schedule. Only the validator count and fork
+      # epoch are compressed so the transition is practical on a laptop.
+      export CHAIN_ID=7091047534
+      export SLOT_DURATION_IN_SECONDS=12
       export NUMBER_OF_VALIDATORS=16384
       export EL_AND_CL_MNEMONIC='test test test test test test test test test test test junk'
+      export GENESIS_FORK_VERSION=0x10733183
+      export ALTAIR_FORK_VERSION=0x20733183
+      export BELLATRIX_FORK_VERSION=0x30733183
+      export CAPELLA_FORK_VERSION=0x40733183
+      export DENEB_FORK_VERSION=0x50733183
+      export ELECTRA_FORK_VERSION=0x60733183
+      export FULU_FORK_VERSION=0x70733183
+      export GLOAS_FORK_VERSION=0x80733183
       export GENESIS_TIMESTAMP=$(date +%s)
       export GENESIS_DELAY=20
-      # Schedule the Glamsterdam fork (EL: Amsterdam, CL: Gloas) at epoch 1 so
-      # the devnet actually crosses the fork boundary. With 32 slots/epoch at
-      # SLOT_DURATION_IN_SECONDS=12, this activates ~404s after genesis start.
-      # Without this the generator leaves GLOAS_FORK_EPOCH at max-uint64 (never).
+      export GENESIS_GASLIMIT=60000000
+      export WITHDRAWAL_TYPE=0x02
+      export BPO_1_EPOCH=0
+      export BPO_2_EPOCH=0
+      export GAS_LIMIT_SCHEDULE='[{"epoch":1566,"gas_limit":200000000}]'
+      # Plataberget activates at epoch 1536. Epoch 1 preserves a real pre-fork
+      # window while reducing the local test to about seven minutes.
       export GLOAS_FORK_EPOCH=1
 
 services:
@@ -71,6 +84,9 @@ services:
       - --miner.gasprice=1
       - --miner.recommit=100ms
       - --rpc.allow-unprotected-txs
+      # op-deployer PR #21728 delegates gas estimation to L1. Disable Geth's
+      # lower default RPC gas cap so estimation can use the full block gas limit.
+      - --rpc.gascap=0
     ports:
       - "8545:8545"
       - "8546:8546"
@@ -120,7 +136,7 @@ services:
   # + teku-secrets/ (no wallet import) and Teku runs the validator client
   # in-process, so it cleanly replaces both lighthouse and lighthouse-vc.
   teku:
-    image: ethpandaops/teku:glamsterdam-devnet-6
+    image: *teku-image
     container_name: teku
     profiles: ["l1"]
     # Run as root so Teku can write its DB/logs to the root-owned named volume.
@@ -231,7 +247,7 @@ services:
       - shell-tools:/tools
       - blob-data:/data
 
-  # L1 Beacon readiness check - exits when lighthouse's beacon HTTP API responds
+  # L1 Beacon readiness check - exits when Teku's beacon HTTP API responds
   l1-beacon-ready:
     image: *python-image
     container_name: l1-beacon-ready
@@ -241,11 +257,11 @@ services:
     command:
       - |
         set -e
-        echo "Waiting for lighthouse beacon API..."
+        echo "Waiting for Teku beacon API..."
         until wget -qO /dev/null ${L1_BEACON_URL:-http://teku:5052}/eth/v1/beacon/headers/genesis 2>/dev/null; do
           sleep 2
         done
-        echo "Lighthouse beacon API is ready."
+        echo "Teku beacon API is ready."
 
   # Resolves the L1 beacon genesis block root and writes it to a shared volume.
   # blob-archiver needs this value but its image has no shell to compute it.
@@ -412,10 +428,10 @@ services:
           sed 's/.*"result":"\([^"]*\)".*/\1/')
         L1_CHAIN_ID=$$(printf "%d" "$$CHAIN_ID_HEX")
         echo "L1 chain ID: $$L1_CHAIN_ID"
-        L2_CHAIN_ID_HEX=$$(printf "0x%064x" ${L2_CHAIN_ID:-10200})
+        L2_CHAIN_ID_HEX=$$(printf "0x%064x" ${L2_CHAIN_ID:-420120214})
         op-deployer init \
           --l1-chain-id "$$L1_CHAIN_ID" \
-          --l2-chain-ids ${L2_CHAIN_ID:-10200} \
+          --l2-chain-ids ${L2_CHAIN_ID:-420120214} \
           --workdir /l2-data \
           --intent-type custom
         L1_LOCATOR=$$(grep '^l1ContractsLocator' /l2-data/intent.toml | sed 's/l1ContractsLocator = "\(.*\)"/\1/')
@@ -442,6 +458,10 @@ services:
         eip1559DenominatorCanyon = 250
         eip1559Elasticity = 6
         gasLimit = 60_000_000
+        operatorFeeScalar = 0
+        operatorFeeConstant = 0
+        minBaseFee = 0
+        daFootprintGasScalar = 0
 
         [chains.roles]
         l1ProxyAdminOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
@@ -451,6 +471,10 @@ services:
         batcher = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
         proposer = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
         challenger = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+        [globalDeployOverrides]
+        l2BlockTime = 1
+        l2GenesisKarstTimeOffset = "0x0"
         TOML
         echo "intent.toml written:"
         cat /l2-data/intent.toml
@@ -496,11 +520,11 @@ services:
         echo "=== L2 Deploy Inspect ==="
         op-deployer inspect genesis \
           --workdir /l2-data \
-          ${L2_CHAIN_ID:-10200} > /l2-data/genesis.json
+          ${L2_CHAIN_ID:-420120214} > /l2-data/genesis.json
         echo "Genesis written to /l2-data/genesis.json"
         op-deployer inspect rollup \
           --workdir /l2-data \
-          ${L2_CHAIN_ID:-10200} > /l2-data/rollup.json
+          ${L2_CHAIN_ID:-420120214} > /l2-data/rollup.json
         echo "Rollup config written to /l2-data/rollup.json"
         od -A n -t x1 -N 32 /dev/urandom | tr -d ' \n' > /l2-data/jwt.txt
         echo ""
@@ -585,12 +609,24 @@ services:
     volumes:
       - op-reth-data:/l2-execution-data
       - l2-data:/l2-data:ro
+      - shell-tools:/shared:ro
     depends_on:
       op-reth-init:
         condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9545"]
+      test:
+        [
+          "CMD",
+          "/shared/busybox",
+          "wget",
+          "-q",
+          "-O",
+          "-",
+          "--header=Content-Type: application/json",
+          '--post-data={"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}',
+          "http://localhost:9545",
+        ]
       interval: 3s
       timeout: 3s
       retries: 30
@@ -627,8 +663,13 @@ services:
           --rpc.addr=0.0.0.0 \
           --rpc.port=8547 \
           --sequencer.enabled \
-          --p2p.disable \
           --p2p.sequencer.key=59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+          --p2p.priv.raw=1111111111111111111111111111111111111111111111111111111111111111 \
+          --p2p.listen.ip=0.0.0.0 \
+          --p2p.listen.tcp=9222 \
+          --p2p.no-discovery \
+          --p2p.peerstore.path=memory \
+          --p2p.discovery.path=memory \
           --l1.trustrpc \
           $$L1_CONFIG_FLAG
     ports:
@@ -670,23 +711,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # L1 EL readiness check - exits when blocks are being produced and indexing is complete
+  # L1 EL readiness check. Deployment must finish before Amsterdam so the L2 can
+  # be kept under transfer load while the L1 crosses the fork.
   l1-el-ready:
     image: *foundry-image
     container_name: l1-el-ready
-    profiles: ["l1"]
+    profiles: ["l2"]
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "Waiting for L1 EL to be ready..."
+        echo "Waiting for pre-Amsterdam L1 EL..."
         while true; do
           BLOCK=$$(cast block-number --rpc-url ${L1_RPC_URL:-http://geth:8545} 2>/dev/null || echo "0")
-          if [ "$$BLOCK" != "0" ] && [ -n "$$BLOCK" ]; then
+          if [ -n "$$BLOCK" ] && [ "$$BLOCK" -gt 0 ] 2>/dev/null; then
             if cast logs --from-block 1 --to-block 1 --rpc-url ${L1_RPC_URL:-http://geth:8545} >/dev/null 2>&1; then
-              echo "L1 EL is ready. Block: $$BLOCK, indexing complete."
+              echo "L1 EL is ready before the fork. Block: $$BLOCK."
               exit 0
             fi
-            echo "Block $$BLOCK exists, waiting for indexing..."
+            echo "Block $$BLOCK exists; waiting for indexing..."
           else
             echo "Waiting for block 1..."
           fi
@@ -714,6 +756,204 @@ services:
           sleep 2
         done
 
+  # ---------------------------------------------------------------------------
+  # L2 follower / verifier node (second op-reth + op-node pair).
+  #
+  # op-reth-2 is a plain follower execution engine. op-node-2 is a *verifier*
+  # (no --sequencer.enabled): it derives the safe chain independently from L1
+  # and receives the unsafe chain via libp2p gossip from the sequencer op-node.
+  # This lets check-glamsterdam prove that both L2 nodes advance in lockstep on
+  # the unsafe AND safe chains across the Glamsterdam fork boundary.
+  # ---------------------------------------------------------------------------
+  op-reth-2-init:
+    image: *op-reth-image
+    container_name: op-reth-2-init
+    profiles: ["l2"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        op-reth init --chain /l2-data/genesis.json --datadir /l2-execution-data
+    volumes:
+      - op-reth-2-data:/l2-execution-data
+      - l2-data:/l2-data:ro
+    depends_on:
+      l2-fund-accounts:
+        condition: service_completed_successfully
+
+  op-reth-2:
+    image: *op-reth-image
+    container_name: op-reth-2
+    profiles: ["l2"]
+    command:
+      - node
+      - --chain=/l2-data/genesis.json
+      - --datadir=/l2-execution-data
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=9545
+      - --http.api=eth,net,web3,debug,txpool,miner
+      - --http.corsdomain=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=9546
+      - --ws.api=eth,net,web3,debug,txpool,miner
+      - --ws.origins=*
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=9551
+      - --authrpc.jwtsecret=/l2-data/jwt.txt
+      - --rollup.disable-tx-pool-gossip
+      - --disable-discovery
+    ports:
+      - "9645:9545"
+      - "9646:9546"
+      - "9651:9551"
+    volumes:
+      - op-reth-2-data:/l2-execution-data
+      - l2-data:/l2-data:ro
+      - shell-tools:/shared:ro
+    depends_on:
+      op-reth-2-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/shared/busybox",
+          "wget",
+          "-q",
+          "-O",
+          "-",
+          "--header=Content-Type: application/json",
+          '--post-data={"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}',
+          "http://localhost:9545",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  l2-el-ready-2:
+    image: *foundry-image
+    container_name: l2-el-ready-2
+    profiles: ["l2"]
+    depends_on:
+      op-reth-2:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for L2 follower EL to be ready..."
+        while true; do
+          if cast block-number --rpc-url http://op-reth-2:9545 2>/dev/null; then
+            echo "L2 follower EL is ready."
+            exit 0
+          fi
+          echo "Waiting for op-reth-2..."
+          sleep 2
+        done
+
+  # op-node-2 - L2 follower/verifier consensus node.
+  op-node-2:
+    image: *op-node-image
+    container_name: op-node-2
+    profiles: ["l2"]
+    entrypoint: ["/shared/busybox", "sh", "-c"]
+    environment:
+      - L1_CHAIN_CONFIG=${L1_CHAIN_CONFIG:-/genesis-data/metadata/genesis.json}
+    command:
+      - |
+        set -e
+        if echo "$$L1_CHAIN_CONFIG" | /shared/busybox grep -q '^http'; then
+          /shared/busybox wget -qO /tmp/l1-genesis-raw.json "$$L1_CHAIN_CONFIG"
+          /shared/busybox sed '/"terminalTotalDifficultyPassed"/d' /tmp/l1-genesis-raw.json > /tmp/l1-genesis.json
+          L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+        elif [ -f "$$L1_CHAIN_CONFIG" ]; then
+          /shared/busybox sed '/"terminalTotalDifficultyPassed"/d' "$$L1_CHAIN_CONFIG" > /tmp/l1-genesis.json
+          L1_CONFIG_FLAG="--rollup.l1-chain-config=/tmp/l1-genesis.json"
+        else
+          L1_CONFIG_FLAG=""
+        fi
+        # Discover the sequencer op-node's libp2p peer ID via its opp2p_self RPC,
+        # then static-peer to it so this follower receives the unsafe chain by
+        # gossip. The retry loop tolerates the sequencer's P2P RPC not being up yet.
+        PEERID=""
+        i=0
+        while [ -z "$$PEERID" ] && [ $$i -lt 60 ]; do
+          RESP=$$(/shared/busybox wget -qO- \
+            --header='Content-Type: application/json' \
+            --post-data='{"jsonrpc":"2.0","method":"opp2p_self","params":[],"id":1}' \
+            http://op-node:8547 2>/dev/null || true)
+          PEERID=$$(echo "$$RESP" | /shared/busybox sed -n 's/.*"peerID":"\([^"]*\)".*/\1/p')
+          [ -n "$$PEERID" ] && break
+          echo "waiting for sequencer op-node peerID..."
+          /shared/busybox sleep 2
+          i=$$((i+1))
+        done
+        if [ -z "$$PEERID" ]; then echo "could not obtain sequencer peerID" >&2; exit 1; fi
+        echo "sequencer peerID: $$PEERID"
+        exec op-node \
+          --l1=${L1_RPC_URL:-http://geth:8545} \
+          --l1.beacon=${L1_BEACON_URL:-http://teku:5052} \
+          --l2=http://op-reth-2:9551 \
+          --l2.jwt-secret=/l2-data/jwt.txt \
+          --rollup.config=/l2-data/rollup.json \
+          --rpc.addr=0.0.0.0 \
+          --rpc.port=8547 \
+          --p2p.priv.raw=2222222222222222222222222222222222222222222222222222222222222222 \
+          --p2p.listen.ip=0.0.0.0 \
+          --p2p.listen.tcp=9222 \
+          --p2p.no-discovery \
+          --p2p.peerstore.path=memory \
+          --p2p.discovery.path=memory \
+          --p2p.static=/dns4/op-node/tcp/9222/p2p/$$PEERID \
+          --l1.trustrpc \
+          $$L1_CONFIG_FLAG
+    ports:
+      - "8647:8547"
+    volumes:
+      - l2-data:/l2-data:ro
+      - genesis-data:/genesis-data:ro
+      - shell-tools:/shared:ro
+    depends_on:
+      busybox-tools:
+        condition: service_completed_successfully
+      l2-el-ready-2:
+        condition: service_completed_successfully
+      op-node:
+        condition: service_started
+    restart: unless-stopped
+
+  # Sustained native transfers for the transition test. The sequencer account is
+  # one of op-deployer's funded dev accounts in the generated L2 genesis.
+  transfer-spammer:
+    image: *foundry-image
+    container_name: transfer-spammer
+    profiles: ["test"]
+    entrypoint: ["/bin/sh", "/scripts/spam-transfers.sh"]
+    environment:
+      - RPC_URL=http://op-reth:9545
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      op-node:
+        condition: service_started
+
+  # Exits successfully once both the sequencer and verifier have matching unsafe
+  # and safe heads derived from a post-Amsterdam L1 origin under transfer load.
+  glamsterdam-check:
+    image: *python-image
+    container_name: glamsterdam-check
+    profiles: ["test"]
+    command: ["python", "/scripts/check-glamsterdam.py"]
+    volumes:
+      - ./scripts:/scripts:ro
+      - genesis-data:/genesis-data:ro
+    depends_on:
+      transfer-spammer:
+        condition: service_started
+      op-node-2:
+        condition: service_started
+
 volumes:
   genesis-data:
   geth-data:
@@ -724,3 +964,4 @@ volumes:
   deployments:
   l2-data:
   op-reth-data:
+  op-reth-2-data:
