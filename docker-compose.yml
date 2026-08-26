@@ -37,8 +37,10 @@ configs:
       export BPO_1_EPOCH=0
       export BPO_2_EPOCH=0
       export GAS_LIMIT_SCHEDULE='[{"epoch":1566,"gas_limit":200000000}]'
-      # Plataberget activates at epoch 1536. Epoch 1 preserves a real pre-fork
-      # window while reducing the local test to about seven minutes.
+      # Gloas-at-genesis currently produces a beacon state that Teku rejects
+      # (the genesis block root differs from the state's latest-block root).
+      # Epoch 1 is the earliest known-working devnet-8 activation; the experiment
+      # waits for this fork before starting op-deployer.
       export GLOAS_FORK_EPOCH=1
 
 services:
@@ -711,8 +713,8 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # L1 EL readiness check. Deployment must finish before Amsterdam so the L2 can
-  # be kept under transfer load while the L1 crosses the fork.
+  # L1 EL readiness check. The experiment starts the l2 profile only after the
+  # epoch-1 Amsterdam activation has occurred.
   l1-el-ready:
     image: *foundry-image
     container_name: l1-el-ready
@@ -720,20 +722,36 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "Waiting for pre-Amsterdam L1 EL..."
+        set -e
+        RPC_URL=${L1_RPC_URL:-http://geth:8545}
+        AMSTERDAM_TIME=""
+        if [ "$$RPC_URL" = "http://geth:8545" ]; then
+          echo "Waiting for local L1 genesis metadata..."
+          until [ -f /genesis-data/metadata/genesis.json ]; do sleep 1; done
+          AMSTERDAM_TIME=$$(sed -n 's/.*"amsterdamTime": *\([0-9][0-9]*\).*/\1/p' /genesis-data/metadata/genesis.json)
+          echo "Waiting for post-Amsterdam L1 EL (activation time $$AMSTERDAM_TIME)..."
+        else
+          echo "Waiting for external L1 EL..."
+        fi
         while true; do
-          BLOCK=$$(cast block-number --rpc-url ${L1_RPC_URL:-http://geth:8545} 2>/dev/null || echo "0")
+          BLOCK=$$(cast block-number --rpc-url "$$RPC_URL" 2>/dev/null || echo "0")
+          LATEST_TIME=$$(cast block latest --field timestamp --rpc-url "$$RPC_URL" 2>/dev/null || echo "0")
           if [ -n "$$BLOCK" ] && [ "$$BLOCK" -gt 0 ] 2>/dev/null; then
-            if cast logs --from-block 1 --to-block 1 --rpc-url ${L1_RPC_URL:-http://geth:8545} >/dev/null 2>&1; then
-              echo "L1 EL is ready before the fork. Block: $$BLOCK."
+            if [ -n "$$AMSTERDAM_TIME" ] && [ "$$LATEST_TIME" -lt "$$AMSTERDAM_TIME" ]; then
+              echo "L1 block $$BLOCK is pre-Amsterdam (timestamp $$LATEST_TIME); waiting..."
+            elif cast logs --from-block 1 --to-block 1 --rpc-url "$$RPC_URL" >/dev/null 2>&1; then
+              echo "L1 EL is ready at block $$BLOCK (timestamp $$LATEST_TIME)."
               exit 0
+            else
+              echo "Block $$BLOCK exists; waiting for indexing..."
             fi
-            echo "Block $$BLOCK exists; waiting for indexing..."
           else
             echo "Waiting for block 1..."
           fi
           sleep 2
         done
+    volumes:
+      - genesis-data:/genesis-data:ro
 
   # L2 EL readiness check - exits when op-reth RPC is responsive
   l2-el-ready:

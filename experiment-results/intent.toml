@@ -1,0 +1,36 @@
+configType = "custom"
+l1ChainID = 7091047534
+l1ContractsLocator = "embedded"
+l2ContractsLocator = "embedded"
+fundDevAccounts = true
+useInterop = false
+opcmAddress = "0x4e38c4d34e9aff0027ee0bafba2a694ab805f123"
+superchainConfigProxy = "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0"
+
+[[chains]]
+id = "0x00000000000000000000000000000000000000000000000000000000190a8696"
+baseFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+l1FeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+sequencerFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+operatorFeeVaultRecipient = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+eip1559Denominator = 50
+eip1559DenominatorCanyon = 250
+eip1559Elasticity = 6
+gasLimit = 60_000_000
+operatorFeeScalar = 0
+operatorFeeConstant = 0
+minBaseFee = 0
+daFootprintGasScalar = 0
+
+[chains.roles]
+l1ProxyAdminOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+l2ProxyAdminOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+systemConfigOwner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+unsafeBlockSigner = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+batcher = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+proposer = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+challenger = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+[globalDeployOverrides]
+l2BlockTime = 1
+l2GenesisKarstTimeOffset = "0x0"
