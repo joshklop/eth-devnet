@@ -103,13 +103,14 @@ def write_markdown(rows: list[dict[str, Any]], path: Path) -> None:
         "",
         "## Transactions over 16,777,216 total gas",
         "",
-        "| Phase | Transaction | Receipt gas | State gas | Execution gas | State share |",
-        "|---|---|---:|---:|---:|---:|",
+        "| Phase | Description | Transaction | Receipt gas | State gas | Execution gas | State share |",
+        "|---|---|---|---:|---:|---:|---:|",
     ]
     for row in over_cap:
         lines.append(
-            f"| {row['phase']} | `{row['hash']}` | {row['receiptGasUsed']:,} | "
-            f"{row['stateGasUsed']:,} | {row['executionGasUsedAfterRefund']:,} | "
+            f"| {row['phase']} | {row['description']} | `{row['hash']}` | "
+            f"{row['receiptGasUsed']:,} | {row['stateGasUsed']:,} | "
+            f"{row['executionGasUsedAfterRefund']:,} | "
             f"{row['stateGasPercent']:.2f}% |"
         )
 
@@ -118,14 +119,15 @@ def write_markdown(rows: list[dict[str, Any]], path: Path) -> None:
             "",
             "## All deployment transactions",
             "",
-            "| Phase | Nonce | Receipt gas | State gas | Execution gas | New accounts | Code bytes | New slots | Block gas | Bottleneck |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+            "| Phase | Description | Nonce | Receipt gas | State gas | Execution gas | New accounts | Code bytes | New slots | Block gas | Bottleneck |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
         ]
     )
     for row in rows:
         lines.append(
-            f"| {row['phase']} | {row['nonce']} | {row['receiptGasUsed']:,} | "
-            f"{row['stateGasUsed']:,} | {row['executionGasUsedAfterRefund']:,} | "
+            f"| {row['phase']} | {row['description']} | {row['nonce']} | "
+            f"{row['receiptGasUsed']:,} | {row['stateGasUsed']:,} | "
+            f"{row['executionGasUsedAfterRefund']:,} | "
             f"{row['newAccounts']} | {row['deployedCodeBytes']:,} | "
             f"{row['newStorageSlots']} | {row['blockGasUsed']:,} | "
             f"{row['blockBottleneck']} |"
@@ -218,6 +220,7 @@ def main() -> None:
         rows.append(
             {
                 "phase": deployment["phase"],
+                "description": deployment.get("description", deployment["phase"]),
                 "hash": tx_hash,
                 "nonce": deployment["nonce"],
                 "blockNumber": deployment["blockNumber"],
@@ -271,7 +274,9 @@ def main() -> None:
     with (output_dir / "deployment-gas-dimensions.csv").open(
         "w", newline=""
     ) as output:
-        writer = csv.DictWriter(output, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(
+            output, fieldnames=list(rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
     write_markdown(rows, output_dir / "deployment-gas-dimensions.md")

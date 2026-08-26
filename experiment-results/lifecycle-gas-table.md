@@ -2,54 +2,54 @@
 
 All 41 listed L1 transactions executed after Amsterdam activation: **True**.
 
-| # | Chain | Phase | Nonce | Block | Transaction | Gas used | Effective gas price (wei) | L1 data fee (wei) | Blob gas / fee (wei) | Total observed fee (wei) |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | L1 | deploy-superchain-01 | 0 | 33 | `0xb8c0e378ebde39cd2f3ca46e233d69cca9088cbd3b30dd2ac3e7493c6c9f96d7` | 10404725 | 1012197361 | 0 | — | 10531635186930725 |
-| 2 | L1 | deploy-superchain-02 | 1 | 34 | `0x1f5ab9feaec6e33c269f8e334f22ca511a15a0762b76e3de6e3727f61063e954` | 5166384 | 1011195824 | 0 | — | 5224225925980416 |
-| 3 | L1 | deploy-superchain-03 | 2 | 35 | `0x98e25a07c7573244423d5b34eb943655d1dc83a3a8e9a3109007d0a19bb921ec` | 3506360 | 1010033947 | 0 | — | 3541542630402920 |
-| 4 | L1 | deploy-superchain-04 | 3 | 36 | `0x8cbcf3bd0e76cf0c3fae1c9987a5c2092da8872d013dc28be8ac5d0e31df2b96` | 258166 | 1008923883 | 0 | — | 260469843178578 |
-| 5 | L1 | deploy-superchain-05 | 4 | 37 | `0x8ff85601f1a2f9e14de869d14f95ed964ca7de604740de5eb8c705f6316817e1` | 19762 | 1007815723 | 0 | — | 19916454317926 |
-| 6 | L1 | deploy-implementations-01 | 5 | 38 | `0xf1636333db6a76f392676ab2b87661cd3d0356c41cde78c9c6b5cf4950e14100` | 20032541 | 1006839406 | 0 | — | 20169551681110646 |
-| 7 | L1 | deploy-implementations-02 | 6 | 39 | `0x354520c82e6a5cf694cf357980f5ddf2e8fd4a3da914d6b36560e609f7411cc6` | 15180027 | 1006552580 | 0 | — | 15279495341319660 |
-| 8 | L1 | deploy-implementations-03 | 7 | 40 | `0xc9bea2294a23a6c29a58a5d21ffbc042b3768cadf73f7bfaff35937b310a4bdc` | 9884114 | 1006146412 | 0 | — | 9944865836898968 |
-| 9 | L1 | deploy-implementations-04 | 8 | 41 | `0x0ddaf1e3a9ddf1fcd713f4c16fb367a5a9973e08eb2ab7ffcf5bcf0a37557e8e` | 19823841 | 1005630160 | 0 | — | 19935452396644560 |
-| 10 | L1 | deploy-implementations-05 | 9 | 42 | `0x2b8a869a94ef532e5c4535c6a1cdd22d64065a4f16e215ce051dce369f31442e` | 18714403 | 1005390921 | 0 | — | 18815290868135163 |
-| 11 | L1 | deploy-implementations-06 | 10 | 43 | `0x45a060b2ff59e437c0c820710940d3621a791ad7e372deff017922e63d1ea412` | 35078032 | 1005137420 | 0 | — | 35258242583157440 |
-| 12 | L1 | deploy-implementations-07 | 11 | 44 | `0xf0a60f61e02e9097ed1f0dd614c25d8f44cedccd91fe45496bc0fb11df11fcfa` | 7927705 | 1005247464 | 0 | — | 7969305346590120 |
-| 13 | L1 | deploy-implementations-08 | 12 | 45 | `0x3d7f602cbb6f612ad7ec22e655eb4455fdf55b70671fa9e171d99a21a88db211` | 9477365 | 1004764591 | 0 | — | 9522520767982715 |
-| 14 | L1 | deploy-implementations-09 | 13 | 46 | `0xe75edd8b022f21ff43eb07e2e6b41b4454804f83db50526b42afb5b13041c18a` | 23920164 | 1004357190 | 0 | — | 24024388699379160 |
-| 15 | L1 | deploy-implementations-10 | 14 | 47 | `0xce6b9ef3062e151c2c8d4b0158ff0e3ff63c8a9a4b3377338624672496e7200c` | 33406276 | 1004245355 | 0 | — | 33548097500847980 |
-| 16 | L1 | deploy-implementations-11 | 15 | 48 | `0x703bbcfdee660a5272a047fc11cebcb827fdc9f1bee3bf86bc5141652af4ba1d` | 12740433 | 1004308703 | 0 | — | 12795327741888399 |
-| 17 | L1 | deploy-implementations-12 | 16 | 49 | `0x5d8021010e127f54a5e2447c3742097218b7469d3e46fa9159434edadfd2fae3` | 11629200 | 1003999796 | 0 | — | 11675714427643200 |
-| 18 | L1 | deploy-implementations-13 | 17 | 50 | `0x9fba7b23a237febd8ae85f99e5b2fc354b239d4ebfeb609fb2c02b6ee6509aad` | 37024856 | 1003694542 | 0 | — | 37161645885535952 |
-| 19 | L1 | deploy-implementations-14 | 18 | 51 | `0xdc2dc491492c3af9a6a7dd3bfc85c549fd74ebb29ba245a6a548ad7da5d59a89` | 37766433 | 1003807654 | 0 | — | 37910234509678182 |
-| 20 | L1 | deploy-implementations-15 | 19 | 52 | `0x21bc1cf4a33502054c946233154270b79884f9247ed4b6ffe8677b2733a96f00` | 33909847 | 1003936701 | 0 | — | 34043339928594747 |
-| 21 | L1 | deploy-implementations-16 | 20 | 53 | `0x65790dbe69efd3e4c6ab6b5744d3c2f8a29bdd68d61de5a730afc39c64b663e9` | 7186224 | 1004006731 | 0 | — | 7215017266473744 |
-| 22 | L1 | deploy-implementations-17 | 21 | 54 | `0xcac7b6917823b805f2846fadfb50556e87db7a31f8d64e286247f68f1c2cd9cd` | 1958010 | 1003626998 | 0 | — | 1965111698353980 |
-| 23 | L1 | deploy-implementations-18 | 22 | 55 | `0xd9aef618c518392d3d6a4b9cfad38c88a0378c6f47c70c45e6d0b1f2c0fa8022` | 2757995 | 1003203212 | 0 | — | 2766829442679940 |
-| 24 | L1 | deploy-implementations-19 | 23 | 56 | `0xc07acfa91e47f277f1d0635da942ddcbb4ebab39c0073779ae7f57dad526e161` | 3825833 | 1002839807 | 0 | — | 3836697627334231 |
-| 25 | L1 | deploy-implementations-20 | 24 | 57 | `0x542028bdb63d11eb12a225ff716bc6eac19027af352c788b9595bd2cfa78454e` | 10648983 | 1002530476 | 0 | — | 10675929995905908 |
-| 26 | L1 | deploy-implementations-21 | 25 | 58 | `0x972ec165555249ff5a3830d52f4b13c1fe7efadcf11f039502cfdfa0052144de` | 4277407 | 1002328021 | 0 | — | 4287364893321547 |
-| 27 | L1 | deploy-implementations-22 | 26 | 59 | `0x097db4ae93ba3d2243f45c606819b4bd0cfa496046d48c54d9f7a8d5c45847cd` | 2565407 | 1002078979 | 0 | — | 2570740427279453 |
-| 28 | L1 | deploy-implementations-23 | 27 | 60 | `0x4703285deb415d5085890e1d2f5dbbb3b423ba7944217e16ca7a3dd9a55b55e8` | 4874787 | 1001841508 | 0 | — | 4883763959258796 |
-| 29 | L1 | deploy-implementations-24 | 28 | 61 | `0x8a42d8327783fa5d9bd7f6ebe4de5028b1ca38f2890fbae41d9f11f8eb97e7fa` | 28428191 | 1001647006 | 0 | — | 28475012401146146 |
-| 30 | L1 | deploy-implementations-25 | 29 | 62 | `0xb7b735e4e7f8bb21117db32b842ef1895896d906435dba6cf47c4843ddc88a3c` | 26784992 | 1001640027 | 0 | — | 26828920110074784 |
-| 31 | L1 | deploy-implementations-26 | 30 | 63 | `0xf50e43617ca6468a393207402f4754bbb6bd30696c5ef96b965dce2be41a5aa8` | 33739558 | 1001621805 | 0 | — | 33794276983862190 |
-| 32 | L1 | deploy-implementations-27 | 31 | 64 | `0xc708a86dead0f9f5e27de2e6ab432caaf5f6e3328d78d06e85342572b1b722c7` | 23083766 | 1001649514 | 0 | — | 23121842995189724 |
-| 33 | L1 | deploy-implementations-28 | 32 | 65 | `0xdfae32f26502d825cbaddf5ea6f1c5850ee5cc82cf2259178d95e9c507743341` | 22323943 | 1001604875 | 0 | — | 22359770138022125 |
-| 34 | L1 | deploy-implementations-29 | 33 | 66 | `0x6603ebee84d0c23576d38402453e15d80077e5aa4409a3394e10b77188607645` | 37530935 | 1001556112 | 0 | — | 37589337338324720 |
-| 35 | L1 | deploy-op-chain | 34 | 67 | `0x112e5369299950cf31b03b105c613af74d35cf68bfb82a9fdc693cf856a2f639` | 54771292 | 1001608978 | 0 | — | 54859417803859576 |
-| 36 | L1 | setup-fund-sequencer | 35 | 68 | `0x85de282623685d12f2a60bba2dcee6bd4c99998ce8406d5cc9aec5bb9159fd47` | 21000 | 1001768221 | 0 | — | 21037132641000 |
-| 37 | L1 | setup-fund-batcher | 36 | 69 | `0x8722801ec2bdd8081201a70bceb37935bacd534541a12b71881316cf260967cb` | 21000 | 1001547353 | 0 | — | 21032494413000 |
-| 38 | L1 | deposit-l1-portal | 37 | 79 | `0xe94e457232b05ce0746b749174b4cfa61f3c50002b986cffcdf2bd867fef45c3` | 129038 | 1000407293 | 0 | — | 129090556274134 |
-| 39 | L2 | deposit-l2-derived | 0 | 197 | `0xd98c35d7052e2a5e2f31b891b0e9f2c5d610f64eda37c394319e0eed223ace0d` | 21000 | 0 | 0 | 40000 / 0 | 0 |
-| 40 | L2 | l2-transfer-1 | 0 | 217 | `0x4c89c630bdc0f4e56202aa6ea300204b2e3766d30938546c7c23be125f416d8b` | 21000 | 420786148 | 780671 | 40000 / 0 | 8836509888671 |
-| 41 | L2 | l2-transfer-2 | 1 | 219 | `0x4188ae7fc9bcd8290f23b8b3cd9d2bf4f8e6c24852e9d28d27f788382a86a707` | 21000 | 417445585 | 780671 | 40000 / 0 | 8766358065671 |
-| 42 | L2 | l2-transfer-3 | 2 | 221 | `0x509c8ff196ca9529a535c0f3103da6016a68509388f9db24e0528211d5bf2f8a` | 21000 | 414131542 | 683147 | 40000 / 0 | 8696763065147 |
-| 43 | L2 | withdrawal-l2-standard-bridge | 3 | 223 | `0x54245639144ee1eb69e6afb38437936435c722886b77d66c444414c6df33ce0c` | 158213 | 410845193 | 683147 | 40000 / 0 | 65001051203256 |
-| 44 | L1 | batch-submit-l2-194-205 | 12 | 85 | `0x4cac79b66d2ca5747ebb24e9b28bdedafe71bcd204939f11ca894d2a2bb8cb15` | 15000 | 1000182987 | 0 | 131072 / 131072 | 15002744936072 |
-| 45 | L1 | batch-submit-l2-206-218 | 13 | 86 | `0x2d1bac2ea72c9ac43d1c1d9a2d962772b27a17c2e8024fa9135b4cd6808b5b83` | 15000 | 1000160126 | 0 | 131072 / 131072 | 15002402021072 |
-| 46 | L1 | batch-submit-l2-219-230 | 14 | 87 | `0xbd8d6f9dff947038959632b73d382084bd3d48fd803296b0c703dc9d834edfcb` | 15000 | 1000140121 | 0 | 131072 / 131072 | 15002101946072 |
+| # | Chain | Phase | Description | Nonce | Block | Transaction | Gas used | Effective gas price (wei) | L1 data fee (wei) | Blob gas / fee (wei) | Total observed fee (wei) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | L1 | deploy-superchain-01 | Deploy the Superchain ProxyAdmin | 0 | 33 | `0xb8c0e378ebde39cd2f3ca46e233d69cca9088cbd3b30dd2ac3e7493c6c9f96d7` | 10404725 | 1012197361 | 0 | — | 10531635186930725 |
+| 2 | L1 | deploy-superchain-02 | Deploy the SuperchainConfig implementation | 1 | 34 | `0x1f5ab9feaec6e33c269f8e334f22ca511a15a0762b76e3de6e3727f61063e954` | 5166384 | 1011195824 | 0 | — | 5224225925980416 |
+| 3 | L1 | deploy-superchain-03 | Deploy the SuperchainConfig proxy | 2 | 35 | `0x98e25a07c7573244423d5b34eb943655d1dc83a3a8e9a3109007d0a19bb921ec` | 3506360 | 1010033947 | 0 | — | 3541542630402920 |
+| 4 | L1 | deploy-superchain-04 | Upgrade and initialize the SuperchainConfig proxy | 3 | 36 | `0x8cbcf3bd0e76cf0c3fae1c9987a5c2092da8872d013dc28be8ac5d0e31df2b96` | 258166 | 1008923883 | 0 | — | 260469843178578 |
+| 5 | L1 | deploy-superchain-05 | Transfer ownership of the Superchain ProxyAdmin | 4 | 37 | `0x8ff85601f1a2f9e14de869d14f95ed964ca7de604740de5eb8c705f6316817e1` | 19762 | 1007815723 | 0 | — | 19916454317926 |
+| 6 | L1 | deploy-implementations-01 | Deploy the SystemConfig implementation | 5 | 38 | `0xf1636333db6a76f392676ab2b87661cd3d0356c41cde78c9c6b5cf4950e14100` | 20032541 | 1006839406 | 0 | — | 20169551681110646 |
+| 7 | L1 | deploy-implementations-02 | Deploy the L1CrossDomainMessenger implementation | 6 | 39 | `0x354520c82e6a5cf694cf357980f5ddf2e8fd4a3da914d6b36560e609f7411cc6` | 15180027 | 1006552580 | 0 | — | 15279495341319660 |
+| 8 | L1 | deploy-implementations-03 | Deploy the L1ERC721Bridge implementation | 7 | 40 | `0xc9bea2294a23a6c29a58a5d21ffbc042b3768cadf73f7bfaff35937b310a4bdc` | 9884114 | 1006146412 | 0 | — | 9944865836898968 |
+| 9 | L1 | deploy-implementations-04 | Deploy the L1StandardBridge implementation | 8 | 41 | `0x0ddaf1e3a9ddf1fcd713f4c16fb367a5a9973e08eb2ab7ffcf5bcf0a37557e8e` | 19823841 | 1005630160 | 0 | — | 19935452396644560 |
+| 10 | L1 | deploy-implementations-05 | Deploy the OptimismMintableERC20Factory implementation | 9 | 42 | `0x2b8a869a94ef532e5c4535c6a1cdd22d64065a4f16e215ce051dce369f31442e` | 18714403 | 1005390921 | 0 | — | 18815290868135163 |
+| 11 | L1 | deploy-implementations-06 | Deploy the OptimismPortal2 implementation | 10 | 43 | `0x45a060b2ff59e437c0c820710940d3621a791ad7e372deff017922e63d1ea412` | 35078032 | 1005137420 | 0 | — | 35258242583157440 |
+| 12 | L1 | deploy-implementations-07 | Deploy the ETHLockbox implementation | 11 | 44 | `0xf0a60f61e02e9097ed1f0dd614c25d8f44cedccd91fe45496bc0fb11df11fcfa` | 7927705 | 1005247464 | 0 | — | 7969305346590120 |
+| 13 | L1 | deploy-implementations-08 | Deploy the DelayedWETH implementation | 12 | 45 | `0x3d7f602cbb6f612ad7ec22e655eb4455fdf55b70671fa9e171d99a21a88db211` | 9477365 | 1004764591 | 0 | — | 9522520767982715 |
+| 14 | L1 | deploy-implementations-09 | Deploy the PreimageOracle singleton | 13 | 46 | `0xe75edd8b022f21ff43eb07e2e6b41b4454804f83db50526b42afb5b13041c18a` | 23920164 | 1004357190 | 0 | — | 24024388699379160 |
+| 15 | L1 | deploy-implementations-10 | Deploy the MIPS64 singleton | 14 | 47 | `0xce6b9ef3062e151c2c8d4b0158ff0e3ff63c8a9a4b3377338624672496e7200c` | 33406276 | 1004245355 | 0 | — | 33548097500847980 |
+| 16 | L1 | deploy-implementations-11 | Deploy the DisputeGameFactory implementation | 15 | 48 | `0x703bbcfdee660a5272a047fc11cebcb827fdc9f1bee3bf86bc5141652af4ba1d` | 12740433 | 1004308703 | 0 | — | 12795327741888399 |
+| 17 | L1 | deploy-implementations-12 | Deploy the AnchorStateRegistry implementation | 16 | 49 | `0x5d8021010e127f54a5e2447c3742097218b7469d3e46fa9159434edadfd2fae3` | 11629200 | 1003999796 | 0 | — | 11675714427643200 |
+| 18 | L1 | deploy-implementations-13 | Deploy the FaultDisputeGame implementation | 17 | 50 | `0x9fba7b23a237febd8ae85f99e5b2fc354b239d4ebfeb609fb2c02b6ee6509aad` | 37024856 | 1003694542 | 0 | — | 37161645885535952 |
+| 19 | L1 | deploy-implementations-14 | Deploy the PermissionedDisputeGame implementation | 18 | 51 | `0xdc2dc491492c3af9a6a7dd3bfc85c549fd74ebb29ba245a6a548ad7da5d59a89` | 37766433 | 1003807654 | 0 | — | 37910234509678182 |
+| 20 | L1 | deploy-implementations-15 | Deploy the SuperFaultDisputeGame implementation | 19 | 52 | `0x21bc1cf4a33502054c946233154270b79884f9247ed4b6ffe8677b2733a96f00` | 33909847 | 1003936701 | 0 | — | 34043339928594747 |
+| 21 | L1 | deploy-implementations-16 | Deploy the SuperPermissionedDisputeGame implementation | 20 | 53 | `0x65790dbe69efd3e4c6ab6b5744d3c2f8a29bdd68d61de5a730afc39c64b663e9` | 7186224 | 1004006731 | 0 | — | 7215017266473744 |
+| 22 | L1 | deploy-implementations-17 | Deploy the StorageSetter upgrade helper | 21 | 54 | `0xcac7b6917823b805f2846fadfb50556e87db7a31f8d64e286247f68f1c2cd9cd` | 1958010 | 1003626998 | 0 | — | 1965111698353980 |
+| 23 | L1 | deploy-implementations-18 | Deploy the ERC-5202 AddressManager blueprint | 22 | 55 | `0xd9aef618c518392d3d6a4b9cfad38c88a0378c6f47c70c45e6d0b1f2c0fa8022` | 2757995 | 1003203212 | 0 | — | 2766829442679940 |
+| 24 | L1 | deploy-implementations-19 | Deploy the ERC-5202 Proxy blueprint | 23 | 56 | `0xc07acfa91e47f277f1d0635da942ddcbb4ebab39c0073779ae7f57dad526e161` | 3825833 | 1002839807 | 0 | — | 3836697627334231 |
+| 25 | L1 | deploy-implementations-20 | Deploy the ERC-5202 ProxyAdmin blueprint | 24 | 57 | `0x542028bdb63d11eb12a225ff716bc6eac19027af352c788b9595bd2cfa78454e` | 10648983 | 1002530476 | 0 | — | 10675929995905908 |
+| 26 | L1 | deploy-implementations-21 | Deploy the ERC-5202 L1ChugSplashProxy blueprint | 25 | 58 | `0x972ec165555249ff5a3830d52f4b13c1fe7efadcf11f039502cfdfa0052144de` | 4277407 | 1002328021 | 0 | — | 4287364893321547 |
+| 27 | L1 | deploy-implementations-22 | Deploy the ERC-5202 ResolvedDelegateProxy blueprint | 26 | 59 | `0x097db4ae93ba3d2243f45c606819b4bd0cfa496046d48c54d9f7a8d5c45847cd` | 2565407 | 1002078979 | 0 | — | 2570740427279453 |
+| 28 | L1 | deploy-implementations-23 | Deploy the OPContractsManagerContainer release catalog | 27 | 60 | `0x4703285deb415d5085890e1d2f5dbbb3b423ba7944217e16ca7a3dd9a55b55e8` | 4874787 | 1001841508 | 0 | — | 4883763959258796 |
+| 29 | L1 | deploy-implementations-24 | Deploy StandardValidatorUtils | 28 | 61 | `0x8a42d8327783fa5d9bd7f6ebe4de5028b1ca38f2890fbae41d9f11f8eb97e7fa` | 28428191 | 1001647006 | 0 | — | 28475012401146146 |
+| 30 | L1 | deploy-implementations-25 | Deploy OPContractsManagerMigrationValidator | 29 | 62 | `0xb7b735e4e7f8bb21117db32b842ef1895896d906435dba6cf47c4843ddc88a3c` | 26784992 | 1001640027 | 0 | — | 26828920110074784 |
+| 31 | L1 | deploy-implementations-26 | Deploy OPContractsManagerStandardValidator | 30 | 63 | `0xf50e43617ca6468a393207402f4754bbb6bd30696c5ef96b965dce2be41a5aa8` | 33739558 | 1001621805 | 0 | — | 33794276983862190 |
+| 32 | L1 | deploy-implementations-27 | Deploy OPContractsManagerUtils | 31 | 64 | `0xc708a86dead0f9f5e27de2e6ab432caaf5f6e3328d78d06e85342572b1b722c7` | 23083766 | 1001649514 | 0 | — | 23121842995189724 |
+| 33 | L1 | deploy-implementations-28 | Deploy OPContractsManagerMigrator | 32 | 65 | `0xdfae32f26502d825cbaddf5ea6f1c5850ee5cc82cf2259178d95e9c507743341` | 22323943 | 1001604875 | 0 | — | 22359770138022125 |
+| 34 | L1 | deploy-implementations-29 | Deploy OPContractsManagerV2 | 33 | 66 | `0x6603ebee84d0c23576d38402453e15d80077e5aa4409a3394e10b77188607645` | 37530935 | 1001556112 | 0 | — | 37589337338324720 |
+| 35 | L1 | deploy-op-chain | Deploy and initialize the chain-specific L1 contracts through OPContractsManagerV2 | 34 | 67 | `0x112e5369299950cf31b03b105c613af74d35cf68bfb82a9fdc693cf856a2f639` | 54771292 | 1001608978 | 0 | — | 54859417803859576 |
+| 36 | L1 | setup-fund-sequencer | Fund the sequencer account on L1 | 35 | 68 | `0x85de282623685d12f2a60bba2dcee6bd4c99998ce8406d5cc9aec5bb9159fd47` | 21000 | 1001768221 | 0 | — | 21037132641000 |
+| 37 | L1 | setup-fund-batcher | Fund the batcher account on L1 | 36 | 69 | `0x8722801ec2bdd8081201a70bceb37935bacd534541a12b71881316cf260967cb` | 21000 | 1001547353 | 0 | — | 21032494413000 |
+| 38 | L1 | deposit-l1-portal | Deposit ETH through the L1 OptimismPortal | 37 | 79 | `0xe94e457232b05ce0746b749174b4cfa61f3c50002b986cffcdf2bd867fef45c3` | 129038 | 1000407293 | 0 | — | 129090556274134 |
+| 39 | L2 | deposit-l2-derived | Execute the L2 deposit derived from the L1 portal deposit | 0 | 197 | `0xd98c35d7052e2a5e2f31b891b0e9f2c5d610f64eda37c394319e0eed223ace0d` | 21000 | 0 | 0 | 40000 / 0 | 0 |
+| 40 | L2 | l2-transfer-1 | Transfer ETH on L2 (transfer 1) | 0 | 217 | `0x4c89c630bdc0f4e56202aa6ea300204b2e3766d30938546c7c23be125f416d8b` | 21000 | 420786148 | 780671 | 40000 / 0 | 8836509888671 |
+| 41 | L2 | l2-transfer-2 | Transfer ETH on L2 (transfer 2) | 1 | 219 | `0x4188ae7fc9bcd8290f23b8b3cd9d2bf4f8e6c24852e9d28d27f788382a86a707` | 21000 | 417445585 | 780671 | 40000 / 0 | 8766358065671 |
+| 42 | L2 | l2-transfer-3 | Transfer ETH on L2 (transfer 3) | 2 | 221 | `0x509c8ff196ca9529a535c0f3103da6016a68509388f9db24e0528211d5bf2f8a` | 21000 | 414131542 | 683147 | 40000 / 0 | 8696763065147 |
+| 43 | L2 | withdrawal-l2-standard-bridge | Initiate an ETH withdrawal through the L2StandardBridge | 3 | 223 | `0x54245639144ee1eb69e6afb38437936435c722886b77d66c444414c6df33ce0c` | 158213 | 410845193 | 683147 | 40000 / 0 | 65001051203256 |
+| 44 | L1 | batch-submit-l2-194-205 | Submit L2 blocks 194–205 to L1 as a blob batch | 12 | 85 | `0x4cac79b66d2ca5747ebb24e9b28bdedafe71bcd204939f11ca894d2a2bb8cb15` | 15000 | 1000182987 | 0 | 131072 / 131072 | 15002744936072 |
+| 45 | L1 | batch-submit-l2-206-218 | Submit L2 blocks 206–218 to L1 as a blob batch | 13 | 86 | `0x2d1bac2ea72c9ac43d1c1d9a2d962772b27a17c2e8024fa9135b4cd6808b5b83` | 15000 | 1000160126 | 0 | 131072 / 131072 | 15002402021072 |
+| 46 | L1 | batch-submit-l2-219-230 | Submit L2 blocks 219–230 to L1 as a blob batch | 14 | 87 | `0xbd8d6f9dff947038959632b73d382084bd3d48fd803296b0c703dc9d834edfcb` | 15000 | 1000140121 | 0 | 131072 / 131072 | 15002101946072 |
 
 ## Totals
 

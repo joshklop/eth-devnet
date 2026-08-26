@@ -29,6 +29,65 @@ DEFAULT_DEPLOYER = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 DEFAULT_USER = "0xe05fcc23807536bee418f142d19fa0d21bb0cff7"
 L2_STANDARD_BRIDGE = "0x4200000000000000000000000000000000000010"
 
+DEPLOYMENT_DESCRIPTIONS = {
+    "deploy-superchain-01": "Deploy the Superchain ProxyAdmin",
+    "deploy-superchain-02": "Deploy the SuperchainConfig implementation",
+    "deploy-superchain-03": "Deploy the SuperchainConfig proxy",
+    "deploy-superchain-04": "Upgrade and initialize the SuperchainConfig proxy",
+    "deploy-superchain-05": "Transfer ownership of the Superchain ProxyAdmin",
+    "deploy-implementations-01": "Deploy the SystemConfig implementation",
+    "deploy-implementations-02": "Deploy the L1CrossDomainMessenger implementation",
+    "deploy-implementations-03": "Deploy the L1ERC721Bridge implementation",
+    "deploy-implementations-04": "Deploy the L1StandardBridge implementation",
+    "deploy-implementations-05": "Deploy the OptimismMintableERC20Factory implementation",
+    "deploy-implementations-06": "Deploy the OptimismPortal2 implementation",
+    "deploy-implementations-07": "Deploy the ETHLockbox implementation",
+    "deploy-implementations-08": "Deploy the DelayedWETH implementation",
+    "deploy-implementations-09": "Deploy the PreimageOracle singleton",
+    "deploy-implementations-10": "Deploy the MIPS64 singleton",
+    "deploy-implementations-11": "Deploy the DisputeGameFactory implementation",
+    "deploy-implementations-12": "Deploy the AnchorStateRegistry implementation",
+    "deploy-implementations-13": "Deploy the FaultDisputeGame implementation",
+    "deploy-implementations-14": "Deploy the PermissionedDisputeGame implementation",
+    "deploy-implementations-15": "Deploy the SuperFaultDisputeGame implementation",
+    "deploy-implementations-16": "Deploy the SuperPermissionedDisputeGame implementation",
+    "deploy-implementations-17": "Deploy the StorageSetter upgrade helper",
+    "deploy-implementations-18": "Deploy the ERC-5202 AddressManager blueprint",
+    "deploy-implementations-19": "Deploy the ERC-5202 Proxy blueprint",
+    "deploy-implementations-20": "Deploy the ERC-5202 ProxyAdmin blueprint",
+    "deploy-implementations-21": "Deploy the ERC-5202 L1ChugSplashProxy blueprint",
+    "deploy-implementations-22": "Deploy the ERC-5202 ResolvedDelegateProxy blueprint",
+    "deploy-implementations-23": "Deploy the OPContractsManagerContainer release catalog",
+    "deploy-implementations-24": "Deploy StandardValidatorUtils",
+    "deploy-implementations-25": "Deploy OPContractsManagerMigrationValidator",
+    "deploy-implementations-26": "Deploy OPContractsManagerStandardValidator",
+    "deploy-implementations-27": "Deploy OPContractsManagerUtils",
+    "deploy-implementations-28": "Deploy OPContractsManagerMigrator",
+    "deploy-implementations-29": "Deploy OPContractsManagerV2",
+    "deploy-op-chain": "Deploy and initialize the chain-specific L1 contracts through OPContractsManagerV2",
+}
+
+LIFECYCLE_DESCRIPTIONS = {
+    "setup-fund-sequencer": "Fund the sequencer account on L1",
+    "setup-fund-batcher": "Fund the batcher account on L1",
+    "deposit-l1-portal": "Deposit ETH through the L1 OptimismPortal",
+    "deposit-l2-derived": "Execute the L2 deposit derived from the L1 portal deposit",
+    "withdrawal-l2-standard-bridge": "Initiate an ETH withdrawal through the L2StandardBridge",
+}
+
+
+def phase_description(phase: str) -> str:
+    if phase in DEPLOYMENT_DESCRIPTIONS:
+        return DEPLOYMENT_DESCRIPTIONS[phase]
+    if phase in LIFECYCLE_DESCRIPTIONS:
+        return LIFECYCLE_DESCRIPTIONS[phase]
+    if phase.startswith("l2-transfer-"):
+        return f"Transfer ETH on L2 (transfer {phase.rsplit('-', 1)[1]})"
+    batch = re.fullmatch(r"batch-submit-l2-(\d+)-(\d+)", phase)
+    if batch:
+        return f"Submit L2 blocks {batch.group(1)}–{batch.group(2)} to L1 as a blob batch"
+    return phase
+
 
 def hex_int(value: Any) -> int:
     if value is None:
@@ -84,6 +143,7 @@ def transaction_row(
     return {
         "chain": chain,
         "phase": phase,
+        "description": phase_description(phase),
         "hash": tx["hash"],
         "type": hex_int(tx.get("type")),
         "blockNumber": hex_int(receipt["blockNumber"]),
@@ -186,7 +246,9 @@ def write_outputs(
     json_path.write_text(json.dumps({"metadata": metadata, "transactions": rows}, indent=2) + "\n")
 
     with csv_path.open("w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(
+            output, fieldnames=list(rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -194,6 +256,7 @@ def write_outputs(
         "#",
         "Chain",
         "Phase",
+        "Description",
         "Nonce",
         "Block",
         "Transaction",
@@ -224,6 +287,7 @@ def write_outputs(
                     str(index),
                     row["chain"],
                     row["phase"],
+                    row["description"],
                     str(row["nonce"]),
                     str(row["blockNumber"]),
                     f"`{row['hash']}`",
