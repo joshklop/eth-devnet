@@ -95,4 +95,8 @@ cd "$ROOT"
   --state-file "$RESULTS/op-deployer-state.json" \
   --l1-genesis "$RESULTS/l1-genesis.json" \
   --output-dir "$RESULTS"
+./scripts/collect-deployment-gas-dimensions.py \
+  --l1-rpc "$L1_RPC" \
+  --transactions-json "$RESULTS/lifecycle-transactions.json" \
+  --output-dir "$RESULTS"
 echo "Lifecycle succeeded; results are in $RESULTS"

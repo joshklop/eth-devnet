@@ -15,8 +15,9 @@ withdrawal block. Both the sequencer and verifier derived the same safe chain.
 All collected receipts have status 1.
 
 The complete transaction/gas table is in [`lifecycle-gas-table.md`](lifecycle-gas-table.md).
-Machine-readable forms are in `lifecycle-transactions.json` and
-`lifecycle-transactions.csv`.
+The EIP-8037 state/execution split is in
+[`deployment-gas-dimensions.md`](deployment-gas-dimensions.md). Machine-readable
+forms are available as JSON and CSV.
 
 ## Provenance
 
@@ -57,6 +58,27 @@ both profiles together does not deploy during the pre-fork epoch.
 receipt-reported L2 L1-data fee, plus blob gas times blob gas price when the L1
 receipt has those fields.
 
+### EIP-8037 dimensions
+
+The 610,627,957 receipt gas used by the 35 deployment transactions splits into:
+
+| Dimension | Gas | Share |
+|---|---:|---:|
+| State gas | 600,774,390 | 98.39% |
+| Execution gas after refund | 9,853,567 | 1.61% |
+
+All 16 transactions with total receipt gas above EIP-7825's 16,777,216 cap
+exceeded it because of state gas; their individual execution portions were only
+218,233 to 2,417,752 gas. EIP-8037 applies the cap to execution gas, while the
+single `tx.gas` field can include an additional state-gas reservoir.
+
+The split is reconstructed from Geth `prestateTracer` diffs using the exact
+devnet-8 parameters: 1,530 gas per state byte, 120 bytes per new account, one
+state byte per deployed code byte, and 64 bytes per new storage slot. Every
+deployment was alone in its block, and the reconstructed state gas matched the
+post-Amsterdam block `gasUsed` whenever state was the bottleneck. See
+`deployment-gas-dimensions.{md,json,csv}`.
+
 ## Reproduce
 
 Build the image from a clean Optimism checkout at `develop`:
@@ -91,12 +113,15 @@ Run the lifecycle after `op-node`, `op-reth`, and `op-batcher` are up:
 ./scripts/run-lifecycle.sh
 ```
 
-To retrieve the table again without resending transactions:
+To retrieve the tables again without resending transactions:
 
 ```bash
 ./scripts/collect-lifecycle-transactions.py
+./scripts/collect-deployment-gas-dimensions.py
 ```
 
-The collector scans both chains, reads receipts, verifies L1 timestamps against
-`amsterdamTime`, and optionally parses `op-batcher` logs to identify the three
-blob batches that carried the relevant L2 blocks.
+The lifecycle collector scans both chains, reads receipts, verifies L1
+timestamps against `amsterdamTime`, and optionally parses `op-batcher` logs to
+identify the blob batches carrying the relevant L2 blocks. The dimension
+collector traces durable pre/post state to split deployment receipt gas into
+state and execution dimensions.
